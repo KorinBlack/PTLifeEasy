@@ -1,0 +1,29 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<h1 class="page-title">AVAILABLE_MODULES</h1>
+
+<div class="modules-grid">
+    {% if modules %}
+        {% for module in modules %}
+            <div class="module-card">
+                <div class="module-header">
+                    <h2>{{ module.name }}</h2>
+                    <span class="module-status">ACTIVE</span>
+                </div>
+                <p class="module-desc">{{ module.description }}</p>
+                <div class="module-actions">
+                    <a href="{{ module.url }}" class="cyber-btn-primary">INITIALIZE >></a>
+                </div>
+            </div>
+        {% endfor %}
+    {% else %}
+        <div class="empty-state">
+            <p>NO MODULES DETECTED IN SYSTEM DIRECTORY.</p>
+            <p class="hint">Check MODULE_CREATION_GUIDE.md to inject new capabilities.</p>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}
