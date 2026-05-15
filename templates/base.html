@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PTLifeEasy - {% block title %}{% endblock %}</title>
+    <!-- Google Fonts for Cyberpunk Aesthetic -->
+    <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=VT323&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    {% block head %}{% endblock %}
+</head>
+<body>
+    <div class="scanlines"></div>
+    <nav class="navbar">
+        <div class="nav-brand">
+            <span class="glitch-text" data-text="PTLifeEasy">PTLifeEasy</span>
+            <span class="version">v1.0.0</span>
+        </div>
+        <ul class="nav-links">
+            <li><a href="{{ url_for('index') }}" class="cyber-btn">MODULES</a></li>
+            <li><a href="{{ url_for('settings') }}" class="cyber-btn">SETTINGS</a></li>
+        </ul>
+    </nav>
+
+    <div class="container">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="flash-messages">
+                    {% for category, message in messages %}
+                        <div class="flash {{ category }}">{{ message }}</div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        <main class="content-box">
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+
+    <footer>
+        <p>SYSTEM STATUS: <span class="status-online">ONLINE</span> // AUTHORIZED ACCESS ONLY</p>
+    </footer>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

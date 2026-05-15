@@ -1,0 +1,150 @@
+{% extends 'base.html' %}
+
+{% block title %}WSDL Parser & Fuzzer{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='wsdl_fuzzer.css') }}">
+<script src="https://cdn.jsdelivr.net/npm/vue@2.7.14/dist/vue.js"></script>
+{% endblock %}
+
+{% block content %}
+<div id="wsdl-app" v-cloak>
+    <h1 class="page-title">WSDL_FUZZER // <span class="status-online">ACTIVE</span></h1>
+
+    <!-- Setup Section -->
+    <div class="cyber-panel">
+        <h2 class="panel-heading">1. TARGET_ACQUISITION</h2>
+        <div class="form-group">
+            <label>WSDL URL:</label>
+            <input type="text" v-model="wsdlUrl" class="cyber-input" placeholder="http://example.com/service?wsdl">
+        </div>
+        <button @click="parseWsdl" class="cyber-btn-primary" :disabled="loading">
+            [[ loading ? 'PARSING_DATA_STREAM...' : 'EXTRACT_OPERATIONS >>' ]]
+        </button>
+        <div v-if="error" class="error-msg">[[ error ]]</div>
+    </div>
+
+    <!-- Payload Section -->
+    <div class="cyber-panel" v-if="actions.length > 0">
+        <h2 class="panel-heading">2. PAYLOAD_INJECTION_VECTORS</h2>
+        <div class="form-group">
+            <label>PAYLOADS (One per line):</label>
+            <textarea v-model="payloadsRaw" class="cyber-textarea" rows="5" placeholder="0\n-1\n' OR 1=1--\n<script>alert(1)</script>"></textarea>
+        </div>
+        <p class="hint">Loaded [[ payloadCount ]] vectors.</p>
+    </div>
+
+    <!-- Actions Section -->
+    <div class="cyber-panel" v-if="actions.length > 0">
+        <div class="flex-between">
+            <h2 class="panel-heading">3. OPERATION_MATRIX</h2>
+            <button @click="runCollection" class="cyber-btn-danger" :disabled="attacking">
+                [[ attacking ? 'EXECUTING_MATRIX...' : 'RUN_FULL_COLLECTION_ATTACK !!!' ]]
+            </button>
+        </div>
+        
+        <!-- Cyberpunk Progress Bar -->
+        <div class="progress-container" v-if="attacking">
+            <div class="progress-bar">
+                <div class="progress-fill" :style="{ width: progress + '%' }"></div>
+            </div>
+            <div class="progress-text">[[ progress ]]% - INJECTING_PAYLOADS...</div>
+        </div>
+
+        <!-- Global Results View -->
+        <div class="results-table-container" v-if="globalResults.length > 0">
+            <h3>MATRIX_ATTACK_RESULTS</h3>
+            <table class="cyber-table">
+                <thead>
+                    <tr>
+                        <th>ACTION</th>
+                        <th>FIELD</th>
+                        <th>PAYLOAD</th>
+                        <th>STATUS</th>
+                        <th>SIZE</th>
+                        <th>TIME</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr v-for="res in globalResults" :class="{ 'row-error': res.status !== 200 && res.status !== 500 }">
+                        <td>[[ res.action_name ]]</td>
+                        <td>[[ res.field_name ]]</td>
+                        <td class="payload-cell">[[ res.payload ]]</td>
+                        <td :class="getStatusClass(res.status)">[[ res.status ]]</td>
+                        <td>[[ res.length ]] B</td>
+                        <td>[[ res.time_ms ]] ms</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="actions-list">
+            <div v-for="(action, aIndex) in actions" :key="aIndex" class="action-card">
+                
+                <div class="action-header" @click="toggleAction(aIndex)">
+                    <div class="action-title">
+                        <span class="collapse-icon">[[ action.expanded ? '▼' : '▶' ]]</span>
+                        <span class="op-name">[[ action.name ]]</span>
+                    </div>
+                    <div class="action-controls" @click.stop>
+                        <label class="cyber-switch">
+                            <input type="checkbox" v-model="action.active">
+                            <span class="slider"></span>
+                        </label>
+                        <span class="switch-label">INC_IN_MATRIX</span>
+                        <button class="cyber-btn-secondary btn-sm" @click="testSingleAction(action)">PLAY</button>
+                    </div>
+                </div>
+
+                <div class="action-body" v-show="action.expanded">
+                    <p class="action-meta">Service: [[ action.service ]] // Port: [[ action.port ]]</p>
+                    
+                    <div v-if="action.fields.length === 0" class="no-fields">No input parameters required.</div>
+                    
+                    <div class="field-row" v-for="(field, fIndex) in action.fields" :key="fIndex">
+                        <label class="cyber-switch sm">
+                            <input type="checkbox" v-model="field.active">
+                            <span class="slider"></span>
+                        </label>
+                        <div class="field-info">
+                            <span class="field-name">[[ field.name ]]</span>
+                            <span class="field-type">[ [[ field.type ]] ]</span>
+                        </div>
+                        <input type="text" v-model="field.value" class="cyber-input sm" :disabled="!field.active">
+                        <button class="cyber-btn-warning btn-sm" @click="attackField(action, field)" :disabled="!field.active || attacking">ATTACK_FIELD</button>
+                    </div>
+
+                    <!-- Single Field Results -->
+                    <div class="field-results" v-if="action.fieldResults && action.fieldResults.length > 0">
+                        <h4>FIELD_ATTACK_RESULTS</h4>
+                        <table class="cyber-table sm">
+                            <thead>
+                                <tr>
+                                    <th>PAYLOAD</th>
+                                    <th>STATUS</th>
+                                    <th>SIZE</th>
+                                    <th>TIME</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="res in action.fieldResults">
+                                    <td class="payload-cell">[[ res.payload ]]</td>
+                                    <td :class="getStatusClass(res.status)">[[ res.status ]]</td>
+                                    <td>[[ res.length ]] B</td>
+                                    <td>[[ res.time_ms ]] ms</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <button @click="action.fieldResults = null" class="cyber-btn btn-sm">CLEAR_RESULTS</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<!-- Vue Custom Delimiters to not conflict with Jinja -->
+<script src="{{ url_for('static', filename='wsdl_fuzzer.js') }}"></script>
+{% endblock %}

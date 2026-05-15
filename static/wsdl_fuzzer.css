@@ -1,0 +1,340 @@
+/* WSDL Fuzzer Specific Styles */
+[v-cloak] {
+    display: none;
+}
+
+.cyber-panel {
+    background: rgba(21, 24, 40, 0.8);
+    border: 1px solid #333;
+    padding: 20px;
+    margin-bottom: 30px;
+    position: relative;
+    box-shadow: inset 0 0 20px rgba(0,0,0,0.5);
+}
+
+.cyber-panel::before {
+    content: '';
+    position: absolute;
+    top: -2px; left: -2px;
+    width: 20px; height: 20px;
+    border-top: 2px solid var(--neon-cyan);
+    border-left: 2px solid var(--neon-cyan);
+}
+
+.panel-heading {
+    color: var(--neon-cyan);
+    font-family: var(--font-mono);
+    font-size: 1.5rem;
+    margin-bottom: 20px;
+    border-bottom: 1px dashed #444;
+    padding-bottom: 5px;
+}
+
+.flex-between {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.cyber-textarea {
+    width: 100%;
+    background: rgba(0,0,0,0.7);
+    border: 1px solid #555;
+    color: var(--neon-yellow);
+    padding: 10px;
+    font-family: var(--font-mono);
+    font-size: 1.1rem;
+    resize: vertical;
+}
+
+.cyber-textarea:focus {
+    outline: none;
+    border-color: var(--neon-yellow);
+    box-shadow: 0 0 10px rgba(252, 238, 10, 0.2);
+}
+
+.hint {
+    color: #888;
+    font-family: var(--font-mono);
+    font-size: 1rem;
+    margin-top: 5px;
+}
+
+.error-msg {
+    color: var(--neon-pink);
+    font-family: var(--font-mono);
+    margin-top: 15px;
+    padding: 10px;
+    border: 1px dashed var(--neon-pink);
+    background: rgba(255,0,60,0.1);
+}
+
+/* Action Cards */
+.actions-list {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.action-card {
+    border: 1px solid #444;
+    background: #0d0e15;
+    transition: border-color 0.2s;
+}
+
+.action-card:hover {
+    border-color: var(--neon-cyan);
+}
+
+.action-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px;
+    cursor: pointer;
+    background: rgba(255,255,255,0.02);
+}
+
+.action-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--text-main);
+    font-size: 1.2rem;
+    font-weight: bold;
+}
+
+.collapse-icon {
+    color: var(--neon-cyan);
+    font-size: 0.8rem;
+}
+
+.op-name {
+    color: var(--neon-yellow);
+    font-family: var(--font-mono);
+}
+
+.action-controls {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.action-body {
+    padding: 20px;
+    border-top: 1px dashed #333;
+    background: rgba(0,0,0,0.3);
+}
+
+.action-meta {
+    color: #777;
+    font-family: var(--font-mono);
+    margin-bottom: 20px;
+}
+
+.no-fields {
+    color: #555;
+    font-style: italic;
+}
+
+.field-row {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 15px;
+    padding: 10px;
+    background: rgba(255,255,255,0.02);
+    border-left: 2px solid #444;
+}
+
+.field-info {
+    min-width: 200px;
+    display: flex;
+    flex-direction: column;
+}
+
+.field-name {
+    color: var(--neon-cyan);
+    font-weight: bold;
+}
+
+.field-type {
+    color: #888;
+    font-size: 0.9rem;
+    font-family: var(--font-mono);
+}
+
+.cyber-input.sm {
+    padding: 5px;
+    font-size: 1rem;
+    flex: 1;
+}
+
+.btn-sm {
+    padding: 5px 10px;
+    font-size: 1rem;
+}
+
+.cyber-btn-warning {
+    background: transparent;
+    color: #ff9900;
+    border: 1px solid #ff9900;
+    font-family: var(--font-mono);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.cyber-btn-warning:hover:not(:disabled) {
+    background: #ff9900;
+    color: #000;
+    box-shadow: 0 0 10px #ff9900;
+}
+
+.cyber-btn-warning:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Custom Cyber Toggle Switch */
+.cyber-switch {
+    position: relative;
+    display: inline-block;
+    width: 40px;
+    height: 20px;
+}
+
+.cyber-switch input { 
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background-color: #333;
+    transition: .2s;
+    border: 1px solid #555;
+}
+
+.slider:before {
+    position: absolute;
+    content: "";
+    height: 14px;
+    width: 14px;
+    left: 2px;
+    bottom: 2px;
+    background-color: #888;
+    transition: .2s;
+}
+
+input:checked + .slider {
+    background-color: rgba(0, 240, 255, 0.2);
+    border-color: var(--neon-cyan);
+}
+
+input:checked + .slider:before {
+    transform: translateX(20px);
+    background-color: var(--neon-cyan);
+    box-shadow: 0 0 5px var(--neon-cyan);
+}
+
+.switch-label {
+    font-family: var(--font-mono);
+    color: #888;
+    font-size: 0.9rem;
+}
+
+/* Progress Bar */
+.progress-container {
+    margin: 20px 0;
+}
+
+.progress-bar {
+    height: 15px;
+    background: #111;
+    border: 1px solid #444;
+    position: relative;
+    overflow: hidden;
+}
+
+.progress-fill {
+    height: 100%;
+    background: var(--neon-pink);
+    box-shadow: 0 0 10px var(--neon-pink);
+    transition: width 0.3s;
+    background-image: repeating-linear-gradient(
+        45deg,
+        transparent,
+        transparent 10px,
+        rgba(0,0,0,0.2) 10px,
+        rgba(0,0,0,0.2) 20px
+    );
+}
+
+.progress-text {
+    font-family: var(--font-mono);
+    color: var(--neon-pink);
+    margin-top: 5px;
+    text-align: right;
+    animation: blink 1s infinite;
+}
+
+/* Tables */
+.cyber-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: var(--font-mono);
+    background: #0a0a0f;
+    margin-top: 15px;
+}
+
+.cyber-table th, .cyber-table td {
+    padding: 10px;
+    text-align: left;
+    border: 1px solid #333;
+}
+
+.cyber-table th {
+    color: var(--neon-yellow);
+    background: rgba(252, 238, 10, 0.1);
+}
+
+.payload-cell {
+    color: #fff;
+    word-break: break-all;
+}
+
+.status-ok { color: #0f0; }
+.status-warn { color: #ff9900; }
+.status-err { color: var(--neon-pink); }
+
+.row-error td {
+    background: rgba(255,0,60,0.05);
+}
+
+.cyber-btn-danger {
+    background: transparent;
+    color: var(--neon-pink);
+    border: 2px dashed var(--neon-pink);
+    padding: 10px 20px;
+    font-family: var(--font-mono);
+    font-size: 1.2rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-transform: uppercase;
+}
+
+.cyber-btn-danger:hover:not(:disabled) {
+    background: var(--neon-pink);
+    color: #fff;
+    box-shadow: 0 0 15px var(--neon-pink);
+}
+
+.cyber-btn-danger:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
