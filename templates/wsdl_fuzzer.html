@@ -9,7 +9,14 @@
 
 {% block content %}
 <div id="wsdl-app" v-cloak>
-    <h1 class="page-title">WSDL_FUZZER // <span class="status-online">ACTIVE</span></h1>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h1 class="page-title" style="margin-bottom: 0;">WSDL_FUZZER // <span class="status-online">ACTIVE</span></h1>
+        <div style="display: flex; gap: 10px;">
+            <button class="cyber-btn-secondary" @click="saveState()">SAVE STATE</button>
+            <button class="cyber-btn-secondary" @click="$refs.stateUpload.click()">LOAD STATE</button>
+            <input type="file" ref="stateUpload" style="display: none;" accept=".json" @change="loadState">
+        </div>
+    </div>
 
     <!-- Setup Section -->
     <div class="cyber-panel">
@@ -17,6 +24,10 @@
         <div class="form-group">
             <label>WSDL URL:</label>
             <input type="text" v-model="wsdlUrl" class="cyber-input" placeholder="http://example.com/service?wsdl">
+        </div>
+        <div class="form-group">
+            <label>CUSTOM HEADERS (One per line, e.g. Authorization: Bearer token):</label>
+            <textarea v-model="customHeaders" class="cyber-textarea" rows="3" placeholder="HeaderName: HeaderValue"></textarea>
         </div>
         <button @click="parseWsdl" class="cyber-btn-primary" :disabled="loading">
             [[ loading ? 'PARSING_DATA_STREAM...' : 'EXTRACT_OPERATIONS >>' ]]
@@ -38,9 +49,14 @@
     <div class="cyber-panel" v-if="actions.length > 0">
         <div class="flex-between">
             <h2 class="panel-heading">3. OPERATION_MATRIX</h2>
-            <button @click="runCollection" class="cyber-btn-danger" :disabled="attacking">
-                [[ attacking ? 'EXECUTING_MATRIX...' : 'RUN_FULL_COLLECTION_ATTACK !!!' ]]
-            </button>
+            <div class="matrix-controls" style="display: flex; gap: 10px;">
+                <button @click="toggleAll" class="cyber-btn-secondary" :disabled="attacking">
+                    [[ allActive ? 'DISABLE_ALL' : 'ENABLE_ALL' ]]
+                </button>
+                <button @click="runCollection" class="cyber-btn-danger" :disabled="attacking">
+                    [[ attacking ? 'EXECUTING_MATRIX...' : 'RUN_FULL_COLLECTION_ATTACK !!!' ]]
+                </button>
+            </div>
         </div>
         
         <!-- Cyberpunk Progress Bar -->
@@ -53,29 +69,48 @@
 
         <!-- Global Results View -->
         <div class="results-table-container" v-if="globalResults.length > 0">
-            <h3>MATRIX_ATTACK_RESULTS</h3>
-            <table class="cyber-table">
-                <thead>
-                    <tr>
-                        <th>ACTION</th>
-                        <th>FIELD</th>
-                        <th>PAYLOAD</th>
-                        <th>STATUS</th>
-                        <th>SIZE</th>
-                        <th>TIME</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr v-for="res in globalResults" :class="{ 'row-error': res.status !== 200 && res.status !== 500 }">
-                        <td>[[ res.action_name ]]</td>
-                        <td>[[ res.field_name ]]</td>
-                        <td class="payload-cell">[[ res.payload ]]</td>
-                        <td :class="getStatusClass(res.status)">[[ res.status ]]</td>
-                        <td>[[ res.length ]] B</td>
-                        <td>[[ res.time_ms ]] ms</td>
-                    </tr>
-                </tbody>
-            </table>
+            <div class="flex-between" style="margin-bottom: 10px;">
+                <h3 style="cursor: pointer; margin: 0;" @click="resultsExpanded = !resultsExpanded">
+                    <span class="collapse-icon">[[ resultsExpanded ? '▼' : '▶' ]]</span> MATRIX_ATTACK_RESULTS
+                </h3>
+            </div>
+            
+            <div v-show="resultsExpanded">
+                <div class="flex-between" style="margin-bottom: 15px;">
+                    <input type="text" v-model="resultsFilter" class="cyber-input" placeholder="Filter results..." style="width: 300px;">
+                    <div style="display: flex; gap: 10px;">
+                        <button class="cyber-btn-danger btn-sm" @click="clearGlobalResults()">CLEAR RESULTS</button>
+                        <button class="cyber-btn-secondary btn-sm" @click="exportResults('csv')">EXPORT CSV</button>
+                        <button class="cyber-btn-secondary btn-sm" @click="exportResults('json')">EXPORT JSON</button>
+                    </div>
+                </div>
+
+                <table class="cyber-table">
+                    <thead>
+                        <tr>
+                            <th @click="sortBy('action_name')" style="cursor: pointer;">ACTION [[ sortKey === 'action_name' ? (sortAsc ? '▲' : '▼') : '' ]]</th>
+                            <th @click="sortBy('field_name')" style="cursor: pointer;">FIELD [[ sortKey === 'field_name' ? (sortAsc ? '▲' : '▼') : '' ]]</th>
+                            <th @click="sortBy('payload')" style="cursor: pointer;">PAYLOAD [[ sortKey === 'payload' ? (sortAsc ? '▲' : '▼') : '' ]]</th>
+                            <th @click="sortBy('status')" style="cursor: pointer;">STATUS [[ sortKey === 'status' ? (sortAsc ? '▲' : '▼') : '' ]]</th>
+                            <th @click="sortBy('length')" style="cursor: pointer;">SIZE [[ sortKey === 'length' ? (sortAsc ? '▲' : '▼') : '' ]]</th>
+                            <th @click="sortBy('time_ms')" style="cursor: pointer;">TIME [[ sortKey === 'time_ms' ? (sortAsc ? '▲' : '▼') : '' ]]</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="res in filteredAndSortedResults" :class="{ 'row-error': res.status !== 200 && res.status !== 500 }">
+                            <td>[[ res.action_name ]]</td>
+                            <td>[[ res.field_name ]]</td>
+                            <td class="payload-cell">[[ res.payload ]]</td>
+                            <td :class="getStatusClass(res.status)">[[ res.status ]]</td>
+                            <td>[[ res.length ]] B</td>
+                            <td>[[ res.time_ms ]] ms</td>
+                        </tr>
+                        <tr v-if="filteredAndSortedResults.length === 0">
+                            <td colspan="6" style="text-align: center; font-style: italic; color: #888;">No results match the filter.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
 
         <div class="actions-list">
@@ -87,17 +122,23 @@
                         <span class="op-name">[[ action.name ]]</span>
                     </div>
                     <div class="action-controls" @click.stop>
-                        <label class="cyber-switch">
-                            <input type="checkbox" v-model="action.active">
-                            <span class="slider"></span>
-                        </label>
-                        <span class="switch-label">INC_IN_MATRIX</span>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <label class="cyber-switch" style="margin: 0;">
+                                <input type="checkbox" v-model="action.active">
+                                <span class="slider"></span>
+                            </label>
+                            <span class="switch-label">INC_IN_MATRIX</span>
+                        </div>
+                        <button class="cyber-btn-warning btn-sm" @click="testXXE(action)">TEST_XXE</button>
                         <button class="cyber-btn-secondary btn-sm" @click="testSingleAction(action)">PLAY</button>
                     </div>
                 </div>
 
                 <div class="action-body" v-show="action.expanded">
-                    <p class="action-meta">Service: [[ action.service ]] // Port: [[ action.port ]]</p>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <p class="action-meta" style="margin-bottom: 0;">Service: [[ action.service ]] // Port: [[ action.port ]]</p>
+                        <button class="cyber-btn-secondary btn-sm" @click="toggleAllFields(action)" v-if="action.fields.length > 0">TOGGLE_ALL_FIELDS</button>
+                    </div>
                     
                     <div v-if="action.fields.length === 0" class="no-fields">No input parameters required.</div>
                     
