@@ -10,7 +10,7 @@ module_bp = Blueprint('wsdl_fuzzer', __name__, template_folder='../../templates'
 
 @module_bp.route('/')
 def index():
-    return render_template('wsdl_fuzzer.html')
+    return render_template('wsdl_fuzzer/index.html')
 
 @module_bp.route('/api/parse', methods=['POST'])
 def parse_wsdl():

@@ -1,6 +1,6 @@
 {
     "port": 5000,
-    "proxy_enabled": true,
+    "proxy_enabled": false,
     "proxy_http": "http://127.0.0.1:8080",
     "proxy_https": "http://127.0.0.1:8080",
     "custom_headers": {
