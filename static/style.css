@@ -133,6 +133,10 @@ body {
     transition: all 0.3s;
 }
 
+.modules-grid .module-card {
+    padding-bottom: 80px;
+}
+
 .module-card::before {
     content: '';
     position: absolute;
@@ -159,6 +163,10 @@ body {
     margin-bottom: 15px;
 }
 
+.modules-grid .module-card h2 {
+    padding-right: 70px;
+}
+
 .module-header h2 {
     color: var(--neon-cyan);
     font-family: var(--font-mono);
@@ -172,11 +180,23 @@ body {
     animation: blink 2s infinite;
 }
 
+.modules-grid .module-card .module-status {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+}
+
 .module-desc {
     color: #aaa;
     margin-bottom: 25px;
     min-height: 50px;
     font-size: 1.1rem;
+}
+
+.modules-grid .module-card .module-actions {
+    position: absolute;
+    bottom: 20px;
+    right: 20px;
 }
 
 .cyber-btn-primary {
