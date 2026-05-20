@@ -1,0 +1,306 @@
+{% extends 'base.html' %}
+
+{% block title %}WSDL Analyzer & Comparer{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='wsdl_analyzer.css') }}">
+<style>
+    .results-container {
+        display: none;
+        margin-top: 30px;
+    }
+    .highlight-mismatch {
+        color: var(--neon-pink);
+        font-weight: bold;
+    }
+    .highlight-sensitive {
+        color: var(--neon-cyan);
+        font-weight: bold;
+    }
+    .export-buttons {
+        display: flex;
+        gap: 10px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+    <h1 class="page-title" style="margin-bottom: 0;">WSDL_META_ANALYZER // <span class="status-online">ACTIVE</span></h1>
+</div>
+
+<div class="cyber-panel">
+    <h2 class="panel-heading">1. TARGET_ACQUISITION</h2>
+    <p style="margin-bottom: 20px; color: #888; font-family: var(--font-mono);">Upload multiple WSDL files or provide URLs to identify type mismatches and sensitive endpoints.</p>
+    
+    <form id="analyzerForm" class="cyber-form">
+        <div class="form-group">
+            <label>WSDL URLs (One per line):</label>
+            <textarea id="urls" name="urls" class="cyber-textarea" rows="4" placeholder="http://example.com/service?wsdl&#10;http://test.com/api?wsdl"></textarea>
+        </div>
+        
+        <div class="form-group">
+            <label>UPLOAD WSDL FILES:</label>
+            <input type="file" id="files" name="files" multiple accept=".wsdl,.xml" class="cyber-input" style="border: 1px dashed var(--neon-cyan); background: rgba(0, 240, 255, 0.05); cursor: pointer; padding: 15px;">
+        </div>
+        
+        <div class="form-group">
+            <label>SENSITIVE KEYWORDS (Comma separated):</label>
+            <input type="text" id="sensitive_keywords" class="cyber-input" value="password, token, secret, key, auth, credential" placeholder="password, token, secret...">
+        </div>
+        
+        <button type="submit" class="cyber-btn-primary" id="analyzeBtn" style="margin-top: 10px;">
+            RUN_ANALYSIS //
+        </button>
+    </form>
+</div>
+
+<div id="loading" style="display: none; margin-top: 20px;" class="cyber-panel">
+    <h2 class="panel-heading">PROCESSING_STREAM</h2>
+    <p class="hint" style="color: var(--neon-cyan);">[+] Analyzing WSDL definitions. Please wait...</p>
+</div>
+
+<div id="errorBox" style="display: none; margin-top: 20px;" class="cyber-panel error-msg">
+    <h2 class="panel-heading" style="color: var(--neon-pink); border-bottom-color: var(--neon-pink);">SYSTEM_ERROR</h2>
+    <span id="errorMessage"></span>
+</div>
+
+<div id="warningBox" style="display: none; margin-top: 20px; background: rgba(252, 238, 10, 0.05); border-color: var(--neon-yellow);" class="cyber-panel error-msg">
+    <h2 class="panel-heading" style="color: var(--neon-yellow); border-bottom-color: var(--neon-yellow);">PARSING_WARNINGS</h2>
+    <div id="warningMessage" style="font-family: var(--font-mono); color: var(--neon-yellow);"></div>
+</div>
+
+<div class="results-container" id="resultsContainer">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h2 class="page-title" style="margin-bottom: 0; color: var(--neon-purple); border-bottom: 2px dashed var(--neon-purple); text-shadow: 2px 2px 0px rgba(157,0,255,0.3);">ANALYSIS_RESULTS</h2>
+        <div class="export-buttons">
+            <button class="cyber-btn-secondary btn-sm" onclick="exportData('csv')">EXPORT CSV</button>
+            <button class="cyber-btn-secondary btn-sm" onclick="exportData('json')">EXPORT JSON</button>
+            <button class="cyber-btn-secondary btn-sm" onclick="exportData('md')">EXPORT MD</button>
+        </div>
+    </div>
+
+    <!-- Mismatches -->
+    <div class="cyber-panel">
+        <h2 class="panel-heading">2. TYPE_MISMATCH_MATRIX</h2>
+        <table class="cyber-table" id="mismatchesTable">
+            <thead>
+                <tr>
+                    <th>FIELD NAME</th>
+                    <th>OBSERVED TYPES</th>
+                    <th>OCCURRENCES</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+
+    <!-- Sensitive Fields -->
+    <div class="cyber-panel">
+        <h2 class="panel-heading">3. SENSITIVE_FIELDS_MATRIX</h2>
+        <table class="cyber-table" id="sensitiveFieldsTable">
+            <thead>
+                <tr>
+                    <th>FIELD NAME</th>
+                    <th>TYPES</th>
+                    <th>OCCURRENCES</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+
+    <!-- Sensitive Operations -->
+    <div class="cyber-panel">
+        <h2 class="panel-heading">4. SENSITIVE_OPERATION_MATRIX</h2>
+        <table class="cyber-table" id="operationsTable">
+            <thead>
+                <tr>
+                    <th>OPERATION NAME</th>
+                    <th>OCCURRENCES</th>
+                    <th>IS CRUD</th>
+                    <th>IS UPLOAD/DOWNLOAD</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let currentResults = null;
+
+    document.getElementById('analyzerForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const urls = document.getElementById('urls').value;
+        const filesInput = document.getElementById('files');
+        const keywords = document.getElementById('sensitive_keywords').value;
+        
+        if (!urls.trim() && filesInput.files.length === 0) {
+            alert('Please provide at least one URL or upload a WSDL file.');
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('urls', urls);
+        formData.append('sensitive_keywords', keywords);
+        
+        for (let i = 0; i < filesInput.files.length; i++) {
+            formData.append('files', filesInput.files[i]);
+        }
+
+        document.getElementById('loading').style.display = 'block';
+        document.getElementById('resultsContainer').style.display = 'none';
+        document.getElementById('errorBox').style.display = 'none';
+        document.getElementById('warningBox').style.display = 'none';
+        
+        const btn = document.getElementById('analyzeBtn');
+        const originalBtnText = btn.innerHTML;
+        btn.innerHTML = 'ANALYZING...';
+        btn.disabled = true;
+
+        try {
+            const response = await fetch('{{ url_for("wsdl_analyzer.analyze") }}', {
+                method: 'POST',
+                body: formData
+            });
+
+            const data = await response.json();
+            
+            if (!response.ok) {
+                throw new Error(data.error || 'Unknown error occurred during analysis');
+            }
+
+            currentResults = data;
+            
+            // Display warnings if some sources failed to parse
+            const warnBox = document.getElementById('warningBox');
+            const warnMsg = document.getElementById('warningMessage');
+            warnBox.style.display = 'none';
+            warnMsg.innerHTML = '';
+            
+            if (data.errors && Object.keys(data.errors).length > 0) {
+                let errHtml = '<ul style="margin: 0; padding-left: 20px;">';
+                for (const [source, err] of Object.entries(data.errors)) {
+                    errHtml += `<li><strong>${escapeHtml(source)}</strong>: ${escapeHtml(err)}</li>`;
+                }
+                errHtml += '</ul>';
+                warnMsg.innerHTML = errHtml;
+                warnBox.style.display = 'block';
+            }
+            
+            renderResults(data);
+            document.getElementById('resultsContainer').style.display = 'block';
+            
+        } catch (error) {
+            const errBox = document.getElementById('errorBox');
+            document.getElementById('errorMessage').textContent = error.message;
+            errBox.style.display = 'block';
+        } finally {
+            document.getElementById('loading').style.display = 'none';
+            btn.innerHTML = originalBtnText;
+            btn.disabled = false;
+        }
+    });
+
+    function renderResults(data) {
+        // Render Mismatches
+        const mismatchesBody = document.querySelector('#mismatchesTable tbody');
+        mismatchesBody.innerHTML = '';
+        if (data.mismatches && data.mismatches.length > 0) {
+            data.mismatches.forEach(m => {
+                mismatchesBody.innerHTML += `
+                    <tr>
+                        <td class="highlight-mismatch">${escapeHtml(m.name)}</td>
+                        <td>${escapeHtml(m.types.join(' | '))}</td>
+                        <td>${m.occurrences}</td>
+                    </tr>
+                `;
+            });
+        } else {
+            mismatchesBody.innerHTML = '<tr><td colspan="3" style="text-align: center; font-style: italic; color: #888;">No type mismatches found.</td></tr>';
+        }
+
+        // Render Sensitive Fields
+        const fieldsBody = document.querySelector('#sensitiveFieldsTable tbody');
+        fieldsBody.innerHTML = '';
+        if (data.sensitive_fields && data.sensitive_fields.length > 0) {
+            data.sensitive_fields.forEach(f => {
+                fieldsBody.innerHTML += `
+                    <tr>
+                        <td class="highlight-sensitive">${escapeHtml(f.name)}</td>
+                        <td>${escapeHtml(f.types.join(' | '))}</td>
+                        <td>${f.occurrences}</td>
+                    </tr>
+                `;
+            });
+        } else {
+            fieldsBody.innerHTML = '<tr><td colspan="3" style="text-align: center; font-style: italic; color: #888;">No sensitive fields found.</td></tr>';
+        }
+
+        // Render Sensitive Operations
+        const opsBody = document.querySelector('#operationsTable tbody');
+        opsBody.innerHTML = '';
+        if (data.sensitive_operations && data.sensitive_operations.length > 0) {
+            data.sensitive_operations.forEach(o => {
+                const isCrud = o.is_crud ? '<span style="color: var(--neon-pink);">YES</span>' : 'NO';
+                const isUp = o.is_upload_download ? '<span style="color: var(--neon-pink);">YES</span>' : 'NO';
+                opsBody.innerHTML += `
+                    <tr>
+                        <td class="highlight-sensitive">${escapeHtml(o.name)}</td>
+                        <td>${o.occurrences}</td>
+                        <td>${isCrud}</td>
+                        <td>${isUp}</td>
+                    </tr>
+                `;
+            });
+        } else {
+            opsBody.innerHTML = '<tr><td colspan="4" style="text-align: center; font-style: italic; color: #888;">No sensitive operations found.</td></tr>';
+        }
+    }
+
+    async function exportData(format) {
+        if (!currentResults) return;
+
+        try {
+            const response = await fetch('{{ url_for("wsdl_analyzer.export") }}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ results: currentResults, format: format })
+            });
+
+            if (!response.ok) {
+                const err = await response.json();
+                throw new Error(err.error || 'Export failed');
+            }
+
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'wsdl_analysis.' + format;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+
+        } catch (error) {
+            alert('Export Error: ' + error.message);
+        }
+    }
+
+    function escapeHtml(unsafe) {
+        return (unsafe || '').toString()
+             .replace(/&/g, "&amp;")
+             .replace(/</g, "&lt;")
+             .replace(/>/g, "&gt;")
+             .replace(/"/g, "&quot;")
+             .replace(/'/g, "&#039;");
+    }
+</script>
+{% endblock %}
