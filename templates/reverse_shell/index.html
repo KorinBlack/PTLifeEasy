@@ -1,0 +1,104 @@
+{% extends 'base.html' %}
+{% block title %}Reverse Shell Handler{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='reverse_shell.css') }}">
+{% endblock %}
+
+{% block content %}
+<h1 class="page-title">REVERSE_SHELL_HANDLER // <span class="status-online">ACTIVE</span></h1>
+
+<div class="rs-dashboard">
+    
+    <!-- ═══ LEFT PANEL: Listeners + Payload Generator ═══ -->
+    <div class="rs-panel rs-listeners">
+        <div class="rs-panel-header">
+            LISTENERS
+            <span class="badge" id="listener-count">0</span>
+        </div>
+        <div id="listeners-list">
+            <div style="color:#888;font-family:var(--font-mono);font-size:0.75rem;">No active listeners</div>
+        </div>
+        <div class="listener-controls">
+            <input type="number" id="new-port" placeholder="Port (e.g. 4444)" min="1" max="65535">
+            <button class="btn-sm success" onclick="startListener()">START</button>
+        </div>
+        <div style="margin-top:6px;font-family:var(--font-mono);font-size:0.7rem;color:#888;">
+            Local IP: <span id="local-ip" style="color:var(--neon-cyan);">---</span>
+        </div>
+        
+        <!-- Payload Generator (bottom of left panel) -->
+        <div class="payload-section">
+            <div class="rs-panel-header">PAYLOAD GENERATOR</div>
+            <div class="payload-row">
+                <input type="text" id="payload-host" placeholder="LHOST" value="">
+                <input type="number" id="payload-port" placeholder="LPORT" value="4444" min="1" max="65535">
+            </div>
+            <button class="btn-sm" onclick="generatePayloads()" style="width:100%;margin-bottom:8px;">GENERATE</button>
+            <div class="payload-list" id="payload-list">
+                <div style="color:#888;font-family:var(--font-mono);font-size:0.7rem;">Set LHOST/LPORT and click GENERATE</div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- ═══ CENTER: Terminal ═══ -->
+    <div class="rs-panel rs-terminal">
+        <div class="rs-panel-header">
+            <span>TERMINAL <span id="active-session-label" style="color:#888;">- No session selected</span></span>
+            <span>
+                <button class="btn-sm" onclick="clearTerminal()" style="margin-right:4px;">CLEAR</button>
+                <button class="btn-sm danger" onclick="closeActiveSession()">CLOSE</button>
+            </span>
+        </div>
+        <div class="session-tabs" id="session-tabs"></div>
+        <div class="terminal-output" id="terminal-output">
+            <div class="terminal-placeholder">
+                [*] Waiting for connections...<br>
+                Start a listener and select a session to begin.
+            </div>
+        </div>
+        <div class="terminal-input-row">
+            <input type="text" id="terminal-input" placeholder="Type command and press Enter..." 
+                   onkeydown="if(event.key==='Enter')sendCommand()" disabled>
+            <button class="btn-sm" onclick="sendCommand()" id="send-btn" disabled>SEND</button>
+        </div>
+    </div>
+    
+    <!-- ═══ RIGHT PANEL: Shortcuts ═══ -->
+    <div class="rs-panel rs-shortcuts">
+        <div class="rs-panel-header">SHORTCUTS</div>
+        <div id="shortcuts-list">
+            <div style="color:#888;font-family:var(--font-mono);font-size:0.7rem;">Loading shortcuts...</div>
+        </div>
+    </div>
+</div>
+
+<!-- ═══ Payload Detail Modal ═══ -->
+<div class="rs-modal-overlay" id="payload-modal">
+    <div class="rs-modal">
+        <h3 id="payload-modal-title">PAYLOAD</h3>
+        <pre id="payload-modal-code"></pre>
+        <div style="color:#888;font-family:var(--font-mono);font-size:0.7rem;margin-top:4px;" id="payload-modal-usage"></div>
+        <div class="modal-actions">
+            <button class="btn-sm" onclick="copyPayload()">COPY</button>
+            <button class="btn-sm" onclick="downloadPayload()">DOWNLOAD</button>
+            <button class="btn-sm danger" onclick="closePayloadModal()">CLOSE</button>
+        </div>
+    </div>
+</div>
+
+<!-- ═══ Shortcut Params Modal ═══ -->
+<div class="rs-modal-overlay" id="shortcut-modal">
+    <div class="rs-modal">
+        <h3 id="shortcut-modal-title">SHORTCUT</h3>
+        <div id="shortcut-modal-params"></div>
+        <div class="modal-actions">
+            <button class="btn-sm success" onclick="executeShortcutWithParams()">EXECUTE</button>
+            <button class="btn-sm danger" onclick="closeShortcutModal()">CANCEL</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='reverse_shell.js') }}"></script>
+{% endblock %}

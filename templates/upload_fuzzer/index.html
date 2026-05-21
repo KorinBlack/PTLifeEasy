@@ -1,0 +1,188 @@
+{% extends 'base.html' %}
+{% block title %}Upload Fuzzer{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='upload_fuzzer.css') }}">
+{% endblock %}
+
+{% block content %}
+<h1 class="page-title">WSDL_FUZZER // <span class="status-online">ACTIVE</span></h1>
+
+<div class="uf-layout">
+
+    <!-- ═══ LEFT: Configuration Panel ═══ -->
+    <div class="uf-panel uf-config">
+        <div class="uf-panel-header">CONFIGURATION</div>
+
+        <div class="uf-field">
+            <label>Target URL <span class="req">*</span></label>
+            <input type="text" id="uf-url" placeholder="https://target.com/upload" value="">
+        </div>
+
+        <div class="uf-row-2">
+            <div class="uf-field">
+                <label>File Field Name</label>
+                <input type="text" id="uf-field-name" placeholder="file" value="file">
+            </div>
+            <div class="uf-field">
+                <label>Timeout (s)</label>
+                <input type="number" id="uf-timeout" value="15" min="1" max="120">
+            </div>
+        </div>
+
+        <div class="uf-field">
+            <label>Extra Form Fields <span class="hint">(key=value, one per line)</span></label>
+            <textarea id="uf-extra-fields" rows="3" placeholder="submit=upload&#10;MAX_FILE_SIZE=1000000"></textarea>
+        </div>
+
+        <div class="uf-field">
+            <label>Custom Headers <span class="hint">(Header: Value, one per line)</span></label>
+            <textarea id="uf-headers" rows="3" placeholder="Authorization: Bearer xxx&#10;X-CSRF-Token: abc123"></textarea>
+        </div>
+
+        <div class="uf-field">
+            <label>Cookies <span class="hint">(key=value; key2=value2)</span></label>
+            <input type="text" id="uf-cookies" placeholder="session=abc123; token=xyz">
+        </div>
+
+        <!-- Toggles -->
+        <div class="uf-toggles">
+            <div class="uf-toggle-row">
+                <label class="uf-toggle">
+                    <input type="checkbox" id="uf-waf-mode">
+                    <span class="uf-toggle-slider"></span>
+                </label>
+                <div>
+                    <span class="uf-toggle-label">WAF Bypass Mode</span>
+                    <span class="uf-toggle-desc">Enable additional WAF evasion techniques (+12 tests)</span>
+                </div>
+            </div>
+
+            <div class="uf-toggle-row">
+                <label class="uf-toggle">
+                    <input type="checkbox" id="uf-payload-mode">
+                    <span class="uf-toggle-slider"></span>
+                </label>
+                <div>
+                    <span class="uf-toggle-label">Real Payloads</span>
+                    <span class="uf-toggle-desc">Use actual webshell code instead of benign probes</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Custom Baseline -->
+        <div class="uf-section-title">CUSTOM BASELINE <span class="hint">(optional)</span></div>
+
+        <div class="uf-baseline-area" id="uf-baseline-area">
+            <div class="uf-baseline-dropzone" id="uf-baseline-dropzone">
+                <span class="uf-baseline-icon">📁</span>
+                <span class="uf-baseline-text">Drop a file here or click to browse</span>
+                <span class="uf-baseline-hint">Use a legitimate file (PDF, DOCX, JPG) as baseline for comparison</span>
+                <input type="file" id="uf-baseline-input" style="display:none;" onchange="handleBaselineFile(this)">
+            </div>
+            <div class="uf-baseline-info" id="uf-baseline-info" style="display:none;">
+                <span class="uf-baseline-filename" id="uf-baseline-filename"></span>
+                <span class="uf-baseline-size" id="uf-baseline-size"></span>
+                <button class="uf-baseline-remove" onclick="removeBaseline()" title="Remove baseline file">✕</button>
+            </div>
+        </div>
+
+        <!-- Enabled Extensions -->
+        <div class="uf-section-title">ENABLED EXTENSIONS <span class="hint">(optional, comma-separated)</span></div>
+        <div class="uf-field">
+            <input type="text" id="uf-enabled-extensions" placeholder="jpg, png, pdf, docx" value="">
+            <span class="uf-field-hint">Specify which extensions the target allows for more accurate testing. Leave empty to test all.</span>
+        </div>
+
+        <!-- Success Detection -->
+        <div class="uf-section-title">SUCCESS DETECTION</div>
+
+        <div class="uf-field">
+            <label>Success Keywords <span class="hint">(comma-separated)</span></label>
+            <input type="text" id="uf-keywords" placeholder="uploaded, success, stored, 200 OK" value="uploaded,success,stored">
+        </div>
+
+        <div class="uf-field">
+            <label>Success Regex <span class="hint">(optional, overrides keywords)</span></label>
+            <input type="text" id="uf-regex" placeholder="(file|image).*(uploaded|saved|stored)">
+        </div>
+
+        <button class="uf-btn-primary" id="uf-start-btn" onclick="startFuzz()">
+            START FUZZING
+        </button>
+        <button class="uf-btn-danger" id="uf-stop-btn" onclick="stopFuzz()" style="display:none;">
+            STOP
+        </button>
+    </div>
+
+    <!-- ═══ RIGHT: Results Panel ═══ -->
+    <div class="uf-panel uf-results">
+        <div class="uf-panel-header">
+            RESULTS MATRIX
+            <span id="uf-status-badge" class="uf-badge idle">IDLE</span>
+        </div>
+
+        <!-- Progress -->
+        <div class="uf-progress-container" id="uf-progress-container" style="display:none;">
+            <div class="uf-progress-bar">
+                <div class="uf-progress-fill" id="uf-progress-fill"></div>
+            </div>
+            <div class="uf-progress-text">
+                <span id="uf-progress-label">0 / 0</span>
+                <span id="uf-progress-current"></span>
+            </div>
+        </div>
+
+        <!-- Summary -->
+        <div class="uf-summary" id="uf-summary" style="display:none;"></div>
+
+        <!-- Results Table -->
+        <div class="uf-table-wrap">
+            <table class="uf-table" id="uf-results-table">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Technique</th>
+                        <th>Category</th>
+                        <th>Extension</th>
+                        <th>MIME Type</th>
+                        <th>Status</th>
+                        <th>Size</th>
+                        <th>Time</th>
+                        <th>Match</th>
+                        <th>Details</th>
+                    </tr>
+                </thead>
+                <tbody id="uf-results-body">
+                    <tr>
+                        <td colspan="10" class="uf-empty">Configure target and click START FUZZING to begin</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- ═══ Technique Detail Modal ═══ -->
+<div class="uf-modal-overlay" id="uf-detail-modal">
+    <div class="uf-modal">
+        <h3 id="uf-detail-title">REQUEST DETAILS</h3>
+        <div class="uf-detail-grid">
+            <div>
+                <label>Request Headers</label>
+                <pre id="uf-detail-headers"></pre>
+            </div>
+            <div>
+                <label>Request Body (preview)</label>
+                <pre id="uf-detail-body"></pre>
+            </div>
+        </div>
+        <div class="uf-modal-actions">
+            <button class="uf-btn-secondary" onclick="closeDetailModal()">CLOSE</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='upload_fuzzer.js') }}"></script>
+{% endblock %}
