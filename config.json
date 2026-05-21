@@ -1,9 +1,5 @@
 {
-<<<<<<< Updated upstream
-    "port": 5000,
-=======
     "port": 5001,
->>>>>>> Stashed changes
     "proxy_enabled": true,
     "proxy_http": "http://127.0.0.1:8080",
     "proxy_https": "http://127.0.0.1:8080",
