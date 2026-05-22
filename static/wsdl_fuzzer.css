@@ -338,3 +338,73 @@ input:checked + .slider:before {
     opacity: 0.5;
     cursor: not-allowed;
 }
+
+/* ==================== POWER EDIT STYLES ==================== */
+
+.power-edit-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.power-edit-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 12px;
+    background: rgba(0, 255, 255, 0.03);
+    border: 1px solid #2a2a3a;
+    border-radius: 2px;
+    transition: border-color 0.2s;
+}
+
+.power-edit-row:hover {
+    border-color: var(--neon-cyan);
+}
+
+.power-edit-field-name {
+    font-family: var(--font-mono);
+    color: var(--neon-cyan);
+    font-weight: bold;
+    min-width: 180px;
+    font-size: 0.95rem;
+}
+
+.power-edit-count {
+    font-family: var(--font-mono);
+    color: #888;
+    font-size: 0.8rem;
+    min-width: 90px;
+    white-space: nowrap;
+}
+
+.power-edit-input {
+    flex: 1;
+    min-width: 150px;
+}
+
+.power-edit-row .cyber-btn-warning {
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+/* Flash message toast */
+.power-edit-toast {
+    position: fixed;
+    bottom: 30px;
+    right: 30px;
+    background: rgba(0, 255, 255, 0.15);
+    border: 1px solid var(--neon-cyan);
+    color: var(--neon-cyan);
+    padding: 12px 20px;
+    font-family: var(--font-mono);
+    font-size: 0.9rem;
+    z-index: 9999;
+    animation: toastIn 0.3s ease-out;
+    box-shadow: 0 0 20px rgba(0, 255, 255, 0.2);
+}
+
+@keyframes toastIn {
+    from { transform: translateX(100px); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
