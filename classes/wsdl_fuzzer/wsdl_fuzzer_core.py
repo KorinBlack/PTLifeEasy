@@ -82,7 +82,12 @@ class WSDLFuzzerCore:
             try:
                 if hasattr(self.client.wsdl, 'target_namespace'):
                     target_namespace = self.client.wsdl.target_namespace
-                elif hasattr(self.client.wsdl, 'targetNamespace'):
+                elif hasattr(self.client.wsdl, 'port_types'):
+                    for pt in self.client.wsdl.port_types.values():
+                        if hasattr(pt, 'name') and hasattr(pt.name, 'namespace'):
+                            target_namespace = pt.name.namespace
+                            if target_namespace:
+                                break
                     target_namespace = self.client.wsdl.target_namespace
             except:
                 pass
@@ -179,9 +184,9 @@ class WSDLFuzzerCore:
                 
         envelope = f"""<?xml version="1.0" encoding="utf-8"?>
 {xxe_payload}
-<soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+<soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:srv="{target_namespace}" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
   <soap:Body>
-    <{op_name} xmlns="{target_namespace}">{xml_fields}</{op_name}>
+    <srv:{op_name}>{xml_fields}</srv:{op_name}>
   </soap:Body>
 </soap:Envelope>"""
 
@@ -190,11 +195,12 @@ class WSDLFuzzerCore:
         if config.get('proxy_enabled'):
             if config.get('proxy_http'): proxies['http'] = config['proxy_http']
             if config.get('proxy_https'): proxies['https'] = config['proxy_https']
-            
-        action_val = soap_action if soap_action else (target_namespace.rstrip('/') + '/' + op_name)
+        
+
+        action_val = soap_action if soap_action else ""
         headers = {
             'Content-Type': 'text/xml; charset=utf-8',
-            'SOAPAction': f'"{action_val}"'
+            'SOAPAction': f'{action_val}'
         }
         
         if config.get('custom_headers'):

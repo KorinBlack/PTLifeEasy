@@ -1,8 +1,8 @@
 {
     "port": 5001,
     "proxy_enabled": true,
-    "proxy_http": "http://127.0.0.1:8080",
-    "proxy_https": "http://127.0.0.1:8080",
+    "proxy_http": "http://127.0.0.1:8090",
+    "proxy_https": "http://127.0.0.1:8090",
     "custom_headers": {
         "User-Agent": "PTLifeEasy-Agent/1.0",
         "X-Cyber-Audit": "Active"
