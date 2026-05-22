@@ -38,6 +38,17 @@ def attack_field():
     )
     return jsonify({"results": results})
 
+@module_bp.route('/api/play_request', methods=['POST'])
+def play_request():
+    data = request.json
+    fuzzer = WSDLFuzzerCore(data.get('url'), data.get('headers', ''))
+    results = fuzzer.execute_request(
+        action_data=data.get('action'),
+        field_values=data.get('field_values', {}),
+        target_namespace=data.get('target_namespace', '')
+    )
+    return jsonify({"results": results})
+
 @module_bp.route('/api/run_collection', methods=['POST'])
 def run_collection():
     data = request.json

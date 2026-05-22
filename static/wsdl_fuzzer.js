@@ -116,14 +116,12 @@ new Vue({
             // A quick test with a single payload (default values)
             this.error = null;
             try {
-                const res = await fetch('/wsdl/api/attack_field', {
+                const res = await fetch('/wsdl/api/play_request', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         url: this.wsdlUrl,
                         action: action,
-                        target_field: action.fields.length > 0 ? action.fields[0].name : '',
-                        payloads: ['?'], // Dummy payload just to run the default values
                         target_namespace: this.targetNamespace,
                         headers: this.customHeaders
                     })
