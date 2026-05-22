@@ -9,6 +9,9 @@
 
 {% block content %}
 <div id="wsdl-app" v-cloak>
+    <!-- Power Edit Toast -->
+    <div class="power-edit-toast" v-if="_lastPowerEditMsg">[[ _lastPowerEditMsg ]]</div>
+    
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
         <h1 class="page-title" style="margin-bottom: 0;">WSDL_FUZZER // <span class="status-online">ACTIVE</span></h1>
         <div style="display: flex; gap: 10px;">
@@ -45,10 +48,64 @@
         <p class="hint">Loaded [[ payloadCount ]] vectors.</p>
     </div>
 
+    <!-- Power Edit Section -->
+    <div class="cyber-panel" v-if="actions.length > 0">
+        <div class="flex-between" style="cursor: pointer;" @click="powerEditExpanded = !powerEditExpanded">
+            <h2 class="panel-heading" style="margin-bottom: 0; border-bottom: none;">
+                <span class="collapse-icon">[[ powerEditExpanded ? '▼' : '▶' ]]</span> 3. POWER_EDIT // GLOBAL_FIELD_OVERRIDE
+            </h2>
+            <div style="display: flex; gap: 10px;" @click.stop>
+                <span class="hint" style="margin: 0; align-self: center;">[[ powerEditFields.length ]] fields / [[ powerEditAffectedActions ]] actions</span>
+                <button class="cyber-btn-secondary btn-sm" @click="refreshPowerEdit()">REFRESH_DETECTION</button>
+            </div>
+        </div>
+        
+        <div v-show="powerEditExpanded">
+            <p class="hint" style="margin-bottom: 15px;">Detected [[ powerEditFields.length ]] common field(s) across [[ powerEditAffectedActions ]] action(s). Set values once, apply globally.</p>
+            
+            <!-- Auto-detected common fields -->
+            <div v-if="powerEditFields.length > 0" style="margin-bottom: 20px;">
+                <div class="power-edit-grid">
+                    <div v-for="(pef, idx) in powerEditFields" :key="'pef-'+idx" class="power-edit-row">
+                        <span class="power-edit-field-name">[[ pef.name ]]</span>
+                        <span class="power-edit-count">in [[ pef.count ]] action(s)</span>
+                        <input type="text" v-model="pef.value" class="cyber-input sm power-edit-input" 
+                               :placeholder="'Set value for all ' + pef.count + ' occurrences'">
+                        <button class="cyber-btn-warning btn-sm" @click="applyPowerEditSingle(pef)" 
+                                :disabled="!pef.value.trim()">APPLY</button>
+                    </div>
+                </div>
+                <div style="margin-top: 15px; display: flex; gap: 10px;">
+                    <button class="cyber-btn-primary" @click="applyPowerEditAll()" 
+                            :disabled="!powerEditFields.some(f => f.value.trim())">
+                        APPLY_ALL_POWER_EDITS >>
+                    </button>
+                    <button class="cyber-btn-secondary" @click="clearPowerEditValues()">CLEAR_VALUES</button>
+                </div>
+            </div>
+            
+            <!-- Manual pattern override -->
+            <div style="border-top: 1px dashed #444; padding-top: 15px; margin-top: 10px;">
+                <label style="color: var(--neon-cyan); font-family: var(--font-mono); font-size: 0.9rem;">MANUAL_PATTERN_OVERRIDE (regex):</label>
+                <div style="display: flex; gap: 10px; margin-top: 8px;">
+                    <input type="text" v-model="powerEditPattern" class="cyber-input" 
+                           placeholder="e.g. auth|token|session|apikey" style="flex: 1;">
+                    <input type="text" v-model="powerEditPatternValue" class="cyber-input" 
+                           placeholder="Value to set" style="flex: 1;">
+                    <button class="cyber-btn-warning" @click="applyPowerEditPattern()" 
+                            :disabled="!powerEditPattern.trim() || !powerEditPatternValue.trim()">
+                        APPLY_PATTERN
+                    </button>
+                </div>
+                <p class="hint" style="margin-top: 5px;">Matches field names via regex. Use <code>.*</code> for wildcard, <code>|</code> for OR.</p>
+            </div>
+        </div>
+    </div>
+
     <!-- Actions Section -->
     <div class="cyber-panel" v-if="actions.length > 0">
         <div class="flex-between">
-            <h2 class="panel-heading">3. OPERATION_MATRIX</h2>
+            <h2 class="panel-heading">4. OPERATION_MATRIX</h2>
             <div class="matrix-controls" style="display: flex; gap: 10px;">
                 <button @click="toggleAll" class="cyber-btn-secondary" :disabled="attacking">
                     [[ allActive ? 'DISABLE_ALL' : 'ENABLE_ALL' ]]
@@ -156,7 +213,7 @@
                     </div>
 
                     <!-- Single Field Results -->
-                    <div class="field-results" v-if="action.fieldResults && action.fieldResults.length > 0">
+                    <div class="field-results" v-if="action.fieldResults && Array.isArray(action.fieldResults) && action.fieldResults.length > 0">
                         <h4>FIELD_ATTACK_RESULTS</h4>
                         <table class="cyber-table sm">
                             <thead>

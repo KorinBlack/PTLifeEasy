@@ -15,7 +15,13 @@ new Vue({
         resultsExpanded: true,
         resultsFilter: '',
         sortKey: '',
-        sortAsc: true
+        sortAsc: true,
+        // Power Edit
+        powerEditExpanded: true,
+        powerEditFields: [],
+        powerEditPattern: '',
+        powerEditPatternValue: '',
+        _lastPowerEditMsg: null
     },
     computed: {
         payloadList() {
@@ -28,6 +34,14 @@ new Vue({
             if (this.actions.length === 0) return false;
             // Only check if actions are active, ignore fields
             return this.actions.every(a => a.active);
+        },
+        powerEditAffectedActions() {
+            // Count unique actions that have at least one power edit field
+            const affected = new Set();
+            this.powerEditFields.forEach(pef => {
+                pef.locations.forEach(loc => affected.add(loc.actionName));
+            });
+            return affected.size;
         },
         filteredAndSortedResults() {
             let data = this.globalResults;
@@ -91,6 +105,8 @@ new Vue({
                     fieldResults: []
                 }));
                 this.targetNamespace = data.target_namespace;
+                // Auto-detect common fields for Power Edit
+                this.refreshPowerEdit();
                 
             } catch (err) {
                 this.error = "PARSE_ERROR: " + err.message;
@@ -127,7 +143,9 @@ new Vue({
                     })
                 });
                 const data = await res.json();
-                action.fieldResults = data.results;
+                // Ensure fieldResults is always an array
+                const results = data.results;
+                action.fieldResults = Array.isArray(results) ? results : [results];
                 this.$forceUpdate();
             } catch (err) {
                 alert("EXECUTION_ERROR: " + err.message);
@@ -161,7 +179,7 @@ new Vue({
                 
                 this.progress = 100;
                 const data = await res.json();
-                action.fieldResults = data.results;
+                action.fieldResults = Array.isArray(data.results) ? data.results : [data.results];
                 this.$forceUpdate();
                 
             } catch (err) {
@@ -179,10 +197,11 @@ new Vue({
             this.progress = 0;
             this.globalResults = [];
             
+            let interval;
             try {
                 // Send the entire matrix to the backend
                 // This could be heavy, but we'll simulate progress
-                const interval = setInterval(() => {
+                interval = setInterval(() => {
                     if (this.progress < 90) this.progress += 5;
                 }, 500);
 
@@ -202,9 +221,10 @@ new Vue({
                 this.progress = 100;
                 
                 const data = await res.json();
-                this.globalResults = data.results;
+                this.globalResults = Array.isArray(data.results) ? data.results : [];
                 
             } catch (err) {
+                clearInterval(interval);
                 alert("MATRIX_ERROR: " + err.message);
             } finally {
                 setTimeout(() => { this.attacking = false; }, 1000);
@@ -231,7 +251,7 @@ new Vue({
                     })
                 });
                 const data = await res.json();
-                action.fieldResults = data.results;
+                action.fieldResults = Array.isArray(data.results) ? data.results : [data.results];
                 this.$forceUpdate();
             } catch(err) {
                 alert("XXE_ERROR: " + err.message);
@@ -330,6 +350,8 @@ new Vue({
                     if (state.actions !== undefined) this.actions = state.actions;
                     if (state.targetNamespace !== undefined) this.targetNamespace = state.targetNamespace;
                     
+                    // Refresh power edit after loading state
+                    this.refreshPowerEdit();
                     alert("State loaded successfully!");
                 } catch (err) {
                     alert("ERROR parsing state file: " + err.message);
@@ -337,6 +359,116 @@ new Vue({
             };
             reader.readAsText(file);
             event.target.value = '';
+        },
+        
+        // ==================== POWER EDIT METHODS ====================
+        
+        refreshPowerEdit() {
+            // Detect fields with the same name appearing in multiple actions
+            const fieldMap = {};
+            
+            this.actions.forEach((action, aIndex) => {
+                if (!action.fields) return;
+                action.fields.forEach((field, fIndex) => {
+                    const name = field.name.toLowerCase();
+                    if (!fieldMap[name]) {
+                        fieldMap[name] = {
+                            name: field.name,
+                            count: 0,
+                            value: '',
+                            locations: []
+                        };
+                    }
+                    fieldMap[name].count++;
+                    fieldMap[name].locations.push({
+                        actionIndex: aIndex,
+                        fieldIndex: fIndex,
+                        actionName: action.name
+                    });
+                });
+            });
+            
+            // Keep only fields that appear in 2+ actions, sorted by count desc
+            this.powerEditFields = Object.values(fieldMap)
+                .filter(f => f.count >= 2)
+                .sort((a, b) => b.count - a.count);
+        },
+        
+        applyPowerEditSingle(pef) {
+            if (!pef.value.trim()) return;
+            
+            let applied = 0;
+            pef.locations.forEach(loc => {
+                const action = this.actions[loc.actionIndex];
+                if (action && action.fields && action.fields[loc.fieldIndex]) {
+                    action.fields[loc.fieldIndex].value = pef.value;
+                    applied++;
+                }
+            });
+            
+            this.$forceUpdate();
+            // Flash feedback
+            const msg = `Applied "${pef.value}" to ${applied} field(s) named "${pef.name}"`;
+            this._flashMessage(msg);
+        },
+        
+        applyPowerEditAll() {
+            let totalApplied = 0;
+            this.powerEditFields.forEach(pef => {
+                if (!pef.value.trim()) return;
+                pef.locations.forEach(loc => {
+                    const action = this.actions[loc.actionIndex];
+                    if (action && action.fields && action.fields[loc.fieldIndex]) {
+                        action.fields[loc.fieldIndex].value = pef.value;
+                        totalApplied++;
+                    }
+                });
+            });
+            
+            this.$forceUpdate();
+            this._flashMessage(`Power Edit: Applied values to ${totalApplied} field(s) across all actions.`);
+        },
+        
+        clearPowerEditValues() {
+            this.powerEditFields.forEach(pef => { pef.value = ''; });
+            this.powerEditPattern = '';
+            this.powerEditPatternValue = '';
+        },
+        
+        applyPowerEditPattern() {
+            if (!this.powerEditPattern.trim() || !this.powerEditPatternValue.trim()) return;
+            
+            let regex;
+            try {
+                regex = new RegExp(this.powerEditPattern, 'i');
+            } catch (e) {
+                alert("Invalid regex pattern: " + e.message);
+                return;
+            }
+            
+            let applied = 0;
+            this.actions.forEach(action => {
+                if (!action.fields) return;
+                action.fields.forEach(field => {
+                    if (regex.test(field.name)) {
+                        field.value = this.powerEditPatternValue;
+                        applied++;
+                    }
+                });
+            });
+            
+            this.$forceUpdate();
+            // Refresh the auto-detected list since values may have changed
+            this.refreshPowerEdit();
+            this._flashMessage(`Pattern "${this.powerEditPattern}" matched ${applied} field(s). Value set to "${this.powerEditPatternValue}".`);
+        },
+        
+        _flashMessage(msg) {
+            // Simple flash message (could be improved with a toast component)
+            console.log('[POWER_EDIT]', msg);
+            // Store last message for display
+            this._lastPowerEditMsg = msg;
+            setTimeout(() => { this._lastPowerEditMsg = null; }, 3000);
         }
     }
 });

@@ -42,12 +42,13 @@ def attack_field():
 def play_request():
     data = request.json
     fuzzer = WSDLFuzzerCore(data.get('url'), data.get('headers', ''))
-    results = fuzzer.execute_request(
+    result = fuzzer.execute_request(
         action_data=data.get('action'),
         field_values=data.get('field_values', {}),
         target_namespace=data.get('target_namespace', '')
     )
-    return jsonify({"results": results})
+    # Wrap single result in array for frontend consistency
+    return jsonify({"results": [result]})
 
 @module_bp.route('/api/run_collection', methods=['POST'])
 def run_collection():
