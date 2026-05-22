@@ -82,6 +82,8 @@ class WSDLFuzzerCore:
             try:
                 if hasattr(self.client.wsdl, 'target_namespace'):
                     target_namespace = self.client.wsdl.target_namespace
+                elif hasattr(self.client.wsdl, 'targetNamespace'):
+                    target_namespace = self.client.wsdl.target_namespace
             except:
                 pass
 
