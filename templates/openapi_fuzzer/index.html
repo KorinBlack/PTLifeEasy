@@ -1,0 +1,337 @@
+{% extends 'base.html' %}
+
+{% block title %}OpenAPI/Swagger Parser & Fuzzer{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='openapi_fuzzer.css') }}">
+<script src="https://cdn.jsdelivr.net/npm/vue@2.7.14/dist/vue.js"></script>
+{% endblock %}
+
+{% block content %}
+<div id="openapi-app" v-cloak>
+    <!-- Power Edit Toast -->
+    <div class="power-edit-toast" v-if="_lastPowerEditMsg">[[ _lastPowerEditMsg ]]</div>
+    
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h1 class="page-title" style="margin-bottom: 0;">OPENAPI_FUZZER // <span class="status-online">ACTIVE</span></h1>
+        <div style="display: flex; gap: 10px;">
+            <button class="cyber-btn-secondary" @click="saveState()">SAVE STATE</button>
+            <button class="cyber-btn-secondary" @click="$refs.stateUpload.click()">LOAD STATE</button>
+            <input type="file" ref="stateUpload" style="display: none;" accept=".json" @change="loadState">
+        </div>
+    </div>
+
+    <!-- Setup Section -->
+    <div class="cyber-panel">
+        <h2 class="panel-heading">1. TARGET_ACQUISITION</h2>
+        <div class="form-group">
+            <label>OPENAPI / SWAGGER URL (JSON or YAML):</label>
+            <input type="text" v-model="specUrl" class="cyber-input" placeholder="http://example.com/openapi.json">
+        </div>
+        <div class="form-group">
+            <label>CUSTOM HEADERS (One per line, e.g. Authorization: Bearer token):</label>
+            <textarea v-model="customHeaders" class="cyber-textarea" rows="3" placeholder="HeaderName: HeaderValue"></textarea>
+        </div>
+        <!-- Auth Section -->
+        <div class="auth-section">
+            <label class="auth-label">AUTHENTICATION</label>
+            <div class="auth-controls">
+                <select v-model="auth.type" class="cyber-select">
+                    <option value="none">NONE</option>
+                    <option value="basic">BASIC</option>
+                    <option value="bearer">BEARER TOKEN</option>
+                    <option value="apikey">API KEY</option>
+                </select>
+                <div v-if="auth.type === 'basic'" class="auth-fields">
+                    <input type="text" v-model="auth.username" class="cyber-input" placeholder="Username">
+                    <input type="password" v-model="auth.password" class="cyber-input" placeholder="Password">
+                </div>
+                <div v-if="auth.type === 'bearer'" class="auth-fields">
+                    <input type="text" v-model="auth.token" class="cyber-input" placeholder="Bearer token" style="flex: 1;">
+                </div>
+                <div v-if="auth.type === 'apikey'" class="auth-fields">
+                    <input type="text" v-model="auth.key_name" class="cyber-input" placeholder="Header name (e.g. X-API-Key)" style="flex: 1;">
+                    <input type="text" v-model="auth.key_value" class="cyber-input" placeholder="API Key value" style="flex: 1;">
+                </div>
+            </div>
+        </div>
+        <button @click="parseSpec" class="cyber-btn-primary" :disabled="loading">
+            [[ loading ? 'PARSING_DATA_STREAM...' : 'EXTRACT_ENDPOINTS >>' ]]
+        </button>
+        <div v-if="error" class="error-msg">[[ error ]]</div>
+    </div>
+
+    <!-- Collection Info -->
+    <div class="cyber-panel" v-if="actions.length > 0">
+        <h2 class="panel-heading">COLLECTION_INTEL</h2>
+        <div class="intel-grid">
+            <div class="intel-item">
+                <span class="intel-label">TITLE</span>
+                <span class="intel-value">[[ collectionTitle ]]</span>
+            </div>
+            <div class="intel-item">
+                <span class="intel-label">VERSION</span>
+                <span class="intel-value">[[ openapiVersion ]]</span>
+            </div>
+            <div class="intel-item">
+                <span class="intel-label">ENDPOINTS</span>
+                <span class="intel-value">[[ actions.length ]]</span>
+            </div>
+        </div>
+        <div class="form-group" style="margin-top: 15px;">
+            <label>BASE_URL (editable, applies to all requests):</label>
+            <div style="display: flex; gap: 10px;">
+                <input type="text" v-model="baseUrl" class="cyber-input" placeholder="http://target-host:port">
+                <button class="cyber-btn-secondary btn-sm" @click="resetBaseUrl">RESET_TO_SPEC</button>
+            </div>
+            <p class="hint">Per-endpoint override available in each endpoint card.</p>
+        </div>
+    </div>
+
+    <!-- Payload Section -->
+    <div class="cyber-panel" v-if="actions.length > 0">
+        <h2 class="panel-heading">2. PAYLOAD_INJECTION_VECTORS</h2>
+        <div class="form-group">
+            <label>PAYLOADS (One per line):</label>
+            <textarea v-model="payloadsRaw" class="cyber-textarea" rows="5" placeholder="0\n-1\n' OR 1=1--\n<script>alert(1)</script>"></textarea>
+        </div>
+        <p class="hint">Loaded [[ payloadCount ]] vectors.</p>
+    </div>
+
+    <!-- Power Edit Section -->
+    <div class="cyber-panel" v-if="actions.length > 0">
+        <div class="flex-between" style="cursor: pointer;" @click="powerEditExpanded = !powerEditExpanded">
+            <h2 class="panel-heading" style="margin-bottom: 0; border-bottom: none;">
+                <span class="collapse-icon">[[ powerEditExpanded ? '▼' : '▶' ]]</span> 3. POWER_EDIT // GLOBAL_FIELD_OVERRIDE
+            </h2>
+            <div style="display: flex; gap: 10px;" @click.stop>
+                <span class="hint" style="margin: 0; align-self: center;">[[ powerEditFields.length ]] fields / [[ powerEditAffectedActions ]] endpoints</span>
+                <button class="cyber-btn-secondary btn-sm" @click="refreshPowerEdit()">REFRESH_DETECTION</button>
+            </div>
+        </div>
+        
+        <div v-show="powerEditExpanded">
+            <p class="hint" style="margin-bottom: 15px;">Detected [[ powerEditFields.length ]] common parameter(s) across [[ powerEditAffectedActions ]] endpoint(s). Set values once, apply globally.</p>
+            
+            <!-- Auto-detected common fields -->
+            <div v-if="powerEditFields.length > 0" style="margin-bottom: 20px;">
+                <div class="power-edit-grid">
+                    <div v-for="(pef, idx) in powerEditFields" :key="'pef-'+idx" class="power-edit-row">
+                        <span class="power-edit-field-name">[[ pef.name ]]</span>
+                        <span class="power-edit-count">in [[ pef.count ]] endpoint(s)</span>
+                        <input type="text" v-model="pef.value" class="cyber-input sm power-edit-input" 
+                               :placeholder="'Set value for all ' + pef.count + ' occurrences'">
+                        <button class="cyber-btn-warning btn-sm" @click="applyPowerEditSingle(pef)" 
+                                :disabled="!pef.value.trim()">APPLY</button>
+                    </div>
+                </div>
+                <div style="margin-top: 15px; display: flex; gap: 10px;">
+                    <button class="cyber-btn-primary" @click="applyPowerEditAll()" 
+                            :disabled="!powerEditFields.some(f => f.value.trim())">
+                        APPLY_ALL_POWER_EDITS >>
+                    </button>
+                    <button class="cyber-btn-secondary" @click="clearPowerEditValues()">CLEAR_VALUES</button>
+                </div>
+            </div>
+            
+            <!-- Manual pattern override -->
+            <div style="border-top: 1px dashed #444; padding-top: 15px; margin-top: 10px;">
+                <label style="color: var(--neon-cyan); font-family: var(--font-mono); font-size: 0.9rem;">MANUAL_PATTERN_OVERRIDE (regex):</label>
+                <div style="display: flex; gap: 10px; margin-top: 8px;">
+                    <input type="text" v-model="powerEditPattern" class="cyber-input" 
+                           placeholder="e.g. auth|token|session|apikey" style="flex: 1;">
+                    <input type="text" v-model="powerEditPatternValue" class="cyber-input" 
+                           placeholder="Value to set" style="flex: 1;">
+                    <button class="cyber-btn-warning" @click="applyPowerEditPattern()" 
+                            :disabled="!powerEditPattern.trim() || !powerEditPatternValue.trim()">
+                        APPLY_PATTERN
+                    </button>
+                </div>
+                <p class="hint" style="margin-top: 5px;">Matches parameter names via regex. Use <code>.*</code> for wildcard, <code>|</code> for OR.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Actions Section -->
+    <div class="cyber-panel" v-if="actions.length > 0">
+        <div class="flex-between">
+            <h2 class="panel-heading">4. ENDPOINT_MATRIX</h2>
+            <div class="matrix-controls" style="display: flex; gap: 10px;">
+                <button @click="toggleAll" class="cyber-btn-secondary" :disabled="attacking">
+                    [[ allActive ? 'DISABLE_ALL' : 'ENABLE_ALL' ]]
+                </button>
+                <button @click="runCollection" class="cyber-btn-danger" :disabled="attacking">
+                    [[ attacking ? 'EXECUTING_MATRIX...' : 'RUN_FULL_COLLECTION_ATTACK !!!' ]]
+                </button>
+            </div>
+        </div>
+        
+        <!-- Cyberpunk Progress Bar -->
+        <div class="progress-container" v-if="attacking">
+            <div class="progress-bar">
+                <div class="progress-fill" :style="{ width: progress + '%' }"></div>
+            </div>
+            <div class="progress-text">[[ progress ]]% - INJECTING_PAYLOADS...</div>
+        </div>
+
+        <!-- Global Results View -->
+        <div class="results-table-container" v-if="globalResults.length > 0">
+            <div class="flex-between" style="margin-bottom: 10px;">
+                <h3 style="cursor: pointer; margin: 0;" @click="resultsExpanded = !resultsExpanded">
+                    <span class="collapse-icon">[[ resultsExpanded ? '▼' : '▶' ]]</span> MATRIX_ATTACK_RESULTS
+                </h3>
+            </div>
+            
+            <div v-show="resultsExpanded">
+                <div class="flex-between" style="margin-bottom: 15px;">
+                    <input type="text" v-model="resultsFilter" class="cyber-input" placeholder="Filter results..." style="width: 300px;">
+                    <div style="display: flex; gap: 10px;">
+                        <button class="cyber-btn-danger btn-sm" @click="clearGlobalResults()">CLEAR RESULTS</button>
+                        <button class="cyber-btn-secondary btn-sm" @click="exportResults('csv')">EXPORT CSV</button>
+                        <button class="cyber-btn-secondary btn-sm" @click="exportResults('json')">EXPORT JSON</button>
+                    </div>
+                </div>
+
+                <table class="cyber-table">
+                    <thead>
+                        <tr>
+                            <th @click="sortBy('action_name')" style="cursor: pointer;">ENDPOINT [[ sortKey === 'action_name' ? (sortAsc ? '▲' : '▼') : '' ]]</th>
+                            <th @click="sortBy('field_name')" style="cursor: pointer;">PARAM [[ sortKey === 'field_name' ? (sortAsc ? '▲' : '▼') : '' ]]</th>
+                            <th @click="sortBy('payload')" style="cursor: pointer;">PAYLOAD [[ sortKey === 'payload' ? (sortAsc ? '▲' : '▼') : '' ]]</th>
+                            <th @click="sortBy('status')" style="cursor: pointer;">STATUS [[ sortKey === 'status' ? (sortAsc ? '▲' : '▼') : '' ]]</th>
+                            <th @click="sortBy('length')" style="cursor: pointer;">SIZE [[ sortKey === 'length' ? (sortAsc ? '▲' : '▼') : '' ]]</th>
+                            <th @click="sortBy('time_ms')" style="cursor: pointer;">TIME [[ sortKey === 'time_ms' ? (sortAsc ? '▲' : '▼') : '' ]]</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="res in filteredAndSortedResults" :class="{ 'row-error': res.status !== 200 && res.status !== 500 }">
+                            <td>[[ res.action_name ]]</td>
+                            <td>[[ res.field_name ]]</td>
+                            <td class="payload-cell">[[ res.payload ]]</td>
+                            <td :class="getStatusClass(res.status)">[[ res.status ]]</td>
+                            <td>[[ res.length ]] B</td>
+                            <td>[[ res.time_ms ]] ms</td>
+                        </tr>
+                        <tr v-if="filteredAndSortedResults.length === 0">
+                            <td colspan="6" style="text-align: center; font-style: italic; color: #888;">No results match the filter.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="actions-list">
+            <div v-for="(action, aIndex) in actions" :key="aIndex" class="action-card">
+                
+                <div class="action-header" @click="toggleAction(aIndex)">
+                    <div class="action-title">
+                        <span class="collapse-icon">[[ action.expanded ? '▼' : '▶' ]]</span>
+                        <span class="method-badge" :class="'method-' + action.method.toLowerCase()">[[ action.method ]]</span>
+                        <span class="op-name">[[ action.path ]]</span>
+                    </div>
+                    <div class="action-controls" @click.stop>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <label class="cyber-switch" style="margin: 0;">
+                                <input type="checkbox" v-model="action.active">
+                                <span class="slider"></span>
+                            </label>
+                            <span class="switch-label">INC_IN_MATRIX</span>
+                        </div>
+                        <button class="cyber-btn-secondary btn-sm" @click="testSingleAction(action)">PLAY</button>
+                    </div>
+                </div>
+
+                <div class="action-body" v-show="action.expanded">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <p class="action-meta" style="margin-bottom: 0;">[[ action.summary || 'No summary available' ]]</p>
+                        <button class="cyber-btn-secondary btn-sm" @click="toggleAllFields(action)" v-if="action.fields.length > 0">TOGGLE_ALL_FIELDS</button>
+                    </div>
+
+                    <!-- Per-endpoint Base URL Override -->
+                    <div class="endpoint-override-row">
+                        <label class="cyber-switch sm">
+                            <input type="checkbox" v-model="action.override_base_url">
+                            <span class="slider"></span>
+                        </label>
+                        <span class="switch-label">OVERRIDE_BASE_URL</span>
+                        <input type="text" v-model="action.custom_base_url" class="cyber-input sm" 
+                               :disabled="!action.override_base_url" 
+                               :placeholder="baseUrl"
+                               style="flex: 1; margin-left: 10px;">
+                    </div>
+
+                    <!-- Per-endpoint Auth Override -->
+                    <div class="endpoint-override-row">
+                        <label class="cyber-switch sm">
+                            <input type="checkbox" v-model="action.override_auth">
+                            <span class="slider"></span>
+                        </label>
+                        <span class="switch-label">OVERRIDE_AUTH</span>
+                        <select v-model="action.auth_config.type" class="cyber-select sm" 
+                                :disabled="!action.override_auth" style="margin-left: 10px;">
+                            <option value="none">NONE</option>
+                            <option value="basic">BASIC</option>
+                            <option value="bearer">BEARER</option>
+                            <option value="apikey">API KEY</option>
+                        </select>
+                        <div v-if="action.override_auth && action.auth_config.type === 'basic'" style="display: flex; gap: 5px; flex: 1;">
+                            <input type="text" v-model="action.auth_config.username" class="cyber-input sm" placeholder="User">
+                            <input type="password" v-model="action.auth_config.password" class="cyber-input sm" placeholder="Pass">
+                        </div>
+                        <input v-if="action.override_auth && action.auth_config.type === 'bearer'" 
+                               type="text" v-model="action.auth_config.token" class="cyber-input sm" placeholder="Token" style="flex: 1;">
+                        <div v-if="action.override_auth && action.auth_config.type === 'apikey'" style="display: flex; gap: 5px; flex: 1;">
+                            <input type="text" v-model="action.auth_config.key_name" class="cyber-input sm" placeholder="Header name">
+                            <input type="text" v-model="action.auth_config.key_value" class="cyber-input sm" placeholder="Key value">
+                        </div>
+                    </div>
+                    
+                    <div v-if="action.fields.length === 0" class="no-fields">No input parameters required.</div>
+                    
+                    <div class="field-row" v-for="(field, fIndex) in action.fields" :key="fIndex">
+                        <label class="cyber-switch sm">
+                            <input type="checkbox" v-model="field.active">
+                            <span class="slider"></span>
+                        </label>
+                        <div class="field-info">
+                            <span class="field-name">[[ field.name ]]</span>
+                            <span class="field-type">[ [[ field.type ]] ] <span class="field-in">:: [[ field.in ]]</span><span v-if="field.required" class="field-required">*required</span></span>
+                        </div>
+                        <input type="text" v-model="field.value" class="cyber-input sm" :disabled="!field.active">
+                        <button class="cyber-btn-warning btn-sm" @click="attackField(action, field)" :disabled="!field.active || attacking">ATTACK_FIELD</button>
+                    </div>
+
+                    <!-- Single Field Results -->
+                    <div class="field-results" v-if="action.fieldResults && Array.isArray(action.fieldResults) && action.fieldResults.length > 0">
+                        <h4>FIELD_ATTACK_RESULTS</h4>
+                        <table class="cyber-table sm">
+                            <thead>
+                                <tr>
+                                    <th>PAYLOAD</th>
+                                    <th>STATUS</th>
+                                    <th>SIZE</th>
+                                    <th>TIME</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="res in action.fieldResults">
+                                    <td class="payload-cell">[[ res.payload ]]</td>
+                                    <td :class="getStatusClass(res.status)">[[ res.status ]]</td>
+                                    <td>[[ res.length ]] B</td>
+                                    <td>[[ res.time_ms ]] ms</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <button @click="action.fieldResults = null" class="cyber-btn btn-sm">CLEAR_RESULTS</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<!-- Vue Custom Delimiters to not conflict with Jinja -->
+<script src="{{ url_for('static', filename='openapi_fuzzer.js') }}"></script>
+{% endblock %}
