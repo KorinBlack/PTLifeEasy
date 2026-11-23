@@ -1,0 +1,268 @@
+{% extends 'base.html' %}
+
+{% block title %}Outlook Mail Reader{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='outlook_reader.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="flex-between">
+    <h1 class="page-title" style="margin-bottom: 0;">OUTLOOK_MAIL_READER // <span class="status-online">READ-ONLY</span></h1>
+    <a href="/" class="cyber-btn">&lt;&lt; BACK_TO_CORE</a>
+</div>
+
+<div class="cyber-panel">
+    <h2 class="panel-heading">1. AUTHENTICATION</h2>
+
+    <div class="auth-tabs" role="tablist" aria-label="Authentication backend">
+        <button type="button" class="auth-tab is-active" id="tab-graph" role="tab"
+                aria-selected="true" aria-controls="pane-graph" data-backend="graph">
+            GRAPH / OAUTH_2.0
+        </button>
+        <button type="button" class="auth-tab" id="tab-owa" role="tab"
+                aria-selected="false" aria-controls="pane-owa" data-backend="owa">
+            OWA_FALLBACK <span class="tab-warn">UNSUPPORTED</span>
+        </button>
+    </div>
+
+    <!-- Backend routing for sections 2 and 3; driven by the tabs above. -->
+    <select id="backend-select" hidden>
+        <option value="graph">GRAPH (supported)</option>
+        <option value="owa">OWA (fallback)</option>
+    </select>
+
+    <div class="tab-pane" id="pane-graph" role="tabpanel" aria-labelledby="tab-graph">
+    <p class="hint">
+        Authorization Code Flow con Microsoft Entra ID. Permessi delegati minimi: <code>Mail.Read</code>,
+        <code>User.Read</code>, <code>offline_access</code>. Per le caselle condivise aggiungi <code>Mail.Read.Shared</code>.
+    </p>
+
+    <div id="status-box" class="status-grid">
+        <div><span class="status-label">CONFIGURED</span><span id="status-configured" class="status-value">...</span></div>
+        <div><span class="status-label">AUTHENTICATED</span><span id="status-authenticated" class="status-value">...</span></div>
+        <div><span class="status-label">ACCOUNT</span><span id="status-account" class="status-value">-</span></div>
+        <div><span class="status-label">TENANT</span><span id="status-tenant" class="status-value">-</span></div>
+    </div>
+
+    <div class="button-row">
+        <button type="button" id="btn-login" class="cyber-btn-primary">LOGIN_WITH_MICROSOFT</button>
+        <a href="{{ url_for('outlook_mail.oauth_login') }}" class="cyber-btn-secondary" id="link-login-same-tab">OPEN_IN_SAME_TAB</a>
+        <button type="button" id="btn-logout" class="cyber-btn-secondary">LOGOUT</button>
+        <button type="button" id="btn-me" class="cyber-btn-secondary">VERIFY_IDENTITY</button>
+    </div>
+
+    <div class="credential-help">
+        <details>
+            <summary>Dove trovo CLIENT_ID e CLIENT_SECRET?</summary>
+            <ol>
+                <li>
+                    Apri il
+                    <a href="https://entra.microsoft.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade" target="_blank" rel="noopener noreferrer">Microsoft Entra admin center &rarr; App registrations</a>
+                    e seleziona la tua app (creala con <em>New registration</em> se non esiste).
+                </li>
+                <li>
+                    <strong>CLIENT_ID</strong>: nella pagina <em>Overview</em> dell'app, campo
+                    <em>Application (client) ID</em>. È un GUID, es. <code>11111111-2222-...</code>.
+                </li>
+                <li>
+                    <strong>CLIENT_SECRET</strong>: menu <em>Certificates &amp; secrets</em> &rarr;
+                    <em>Client secrets</em> &rarr; <em>New client secret</em>. Copia subito il campo
+                    <em>Value</em>: dopo il salvataggio non è più visibile (l'ID non serve).
+                </li>
+                <li>
+                    <strong>REDIRECT_URI</strong>: <em>Authentication</em> &rarr; <em>Add a platform</em> &rarr;
+                    <em>Web</em>, e inserisci esattamente
+                    <code>{{ config_redirect_uri }}</code>.
+                </li>
+                <li>
+                    <strong>Permessi</strong>: <em>API permissions</em> &rarr; <em>Add a permission</em> &rarr;
+                    <em>Microsoft Graph</em> &rarr; <em>Delegated</em> &rarr; aggiungi
+                    <code>Mail.Read</code>, <code>User.Read</code> e, solo se leggi caselle condivise,
+                    <code>Mail.Read.Shared</code>. Poi <em>Grant admin consent</em> se richiesto dal tenant.
+                </li>
+            </ol>
+            <p class="hint">
+                <strong>TENANT_ID</strong>: lo trovi in <em>Overview</em> come <em>Directory (tenant) ID</em>.
+                Puoi anche lasciare <code>common</code> se l'app è multi-tenant.
+            </p>
+        </details>
+    </div>
+
+    <details class="settings-details" id="settings-details">
+        <summary>OAuth settings</summary>
+        <form id="settings-form" class="cyber-form">
+            <div class="form-group">
+                <label for="client_id">CLIENT_ID (Application ID):</label>
+                <input type="text" id="client_id" name="client_id" class="cyber-input" placeholder="00000000-0000-0000-0000-000000000000">
+            </div>
+            <div class="form-group">
+                <label for="client_secret">CLIENT_SECRET:</label>
+                <input type="password" id="client_secret" name="client_secret" class="cyber-input" placeholder="lascia vuoto per mantenere il valore salvato" autocomplete="new-password">
+            </div>
+            <div class="form-group">
+                <label for="tenant_id">TENANT_ID (o 'common' / 'organizations' / dominio):</label>
+                <input type="text" id="tenant_id" name="tenant_id" class="cyber-input" placeholder="common">
+            </div>
+            <div class="form-group">
+                <label for="redirect_uri">REDIRECT_URI (deve combaciare con Azure):</label>
+                <input type="text" id="redirect_uri" name="redirect_uri" class="cyber-input">
+            </div>
+            <div class="form-group">
+                <label for="scopes">SCOPES (comma separated):</label>
+                <input type="text" id="scopes" name="scopes" class="cyber-input">
+            </div>
+            <div class="form-group">
+                <label for="aliases">ALIAS (alias=mailbox, separati da virgola — es. team=team@azienda.it):</label>
+                <input type="text" id="aliases" name="aliases" class="cyber-input" placeholder="team=team@azienda.it, support=support@azienda.it">
+            </div>
+            <div class="form-group checkbox-group">
+                <input type="checkbox" id="use_proxy" name="use_proxy" class="cyber-checkbox">
+                <label for="use_proxy">ROUTE_GRAPH_THROUGH_GLOBAL_PROXY</label>
+            </div>
+            <div class="form-group">
+                <label for="api_token">API_TOKEN per agenti (opzionale, protegge /outlook/api/*):</label>
+                <input type="text" id="api_token" name="api_token" class="cyber-input" placeholder="lascia vuoto per non modificarlo">
+            </div>
+            <div class="form-group checkbox-group">
+                <input type="checkbox" id="clear_api_token" name="clear_api_token" class="cyber-checkbox">
+                <label for="clear_api_token">REMOVE_API_TOKEN</label>
+            </div>
+            <button type="submit" class="cyber-btn-primary">SAVE_OAUTH_SETTINGS</button>
+        </form>
+    </details>
+    </div><!-- /pane-graph -->
+
+    <div class="tab-pane" id="pane-owa" role="tabpanel" aria-labelledby="tab-owa" hidden>
+        <p class="hint">
+            <strong style="color: var(--neon-pink);">SCONSIGLIATO / UNSUPPORTED.</strong>
+            Da usare solo se il tenant rifiuta il consenso admin su Microsoft Graph. Automatizza
+            <em>Outlook Web</em> con un profilo browser persistente: nessuna app registration, nessun
+            consenso admin. Dipende dalla UI di Outlook Web e viene bloccato da Conditional Access
+            "require compliant device".
+        </p>
+
+        <div class="status-grid">
+            <div><span class="status-label">PLAYWRIGHT</span><span id="owa-playwright" class="status-value">...</span></div>
+            <div><span class="status-label">PROFILE</span><span id="owa-profile" class="status-value">...</span></div>
+            <div><span class="status-label">ACTIVE_BACKEND</span><span id="owa-active" class="status-value">...</span></div>
+        </div>
+
+        <div class="button-row">
+            <button type="button" id="btn-owa-bootstrap" class="cyber-btn-secondary">BOOTSTRAP_OWA_LOGIN</button>
+            <button type="button" id="btn-owa-diag" class="cyber-btn-secondary">DIAGNOSTICS</button>
+        </div>
+        <p class="hint" style="margin-top:12px;">
+            BOOTSTRAP apre una finestra: fai il login Microsoft una volta, poi chiudi. Il profilo
+            conserva la sessione e il backend OWA la riusa. Mentre questo tab e' attivo le richieste
+            delle sezioni 2 e 3 usano <code>backend=owa</code>.
+        </p>
+        <pre id="owa-output" class="code-block" hidden></pre>
+    </div><!-- /pane-owa -->
+</div>
+
+<div class="cyber-panel">
+    <h2 class="panel-heading">2. FOLDERS</h2>
+    <div class="form-row">
+        <div class="form-group grow">
+            <label for="mailbox-folders">MAILBOX (alias, UPN o vuoto = utente loggato):</label>
+            <input type="text" id="mailbox-folders" class="cyber-input" placeholder="team@azienda.it">
+        </div>
+        <div class="form-group checkbox-group align-end">
+            <input type="checkbox" id="include_hidden" class="cyber-checkbox">
+            <label for="include_hidden">INCLUDE_HIDDEN</label>
+        </div>
+        <button type="button" id="btn-folders" class="cyber-btn-primary">LOAD_FOLDERS</button>
+    </div>
+    <div id="folders-output" class="folders-output"></div>
+</div>
+
+<div class="cyber-panel">
+    <h2 class="panel-heading">3. FETCH_MESSAGES</h2>
+    <form id="fetch-form" class="cyber-form">
+        <div class="form-row">
+            <div class="form-group grow">
+                <label for="mailbox">MAILBOX / ALIAS:</label>
+                <input type="text" id="mailbox" name="mailbox" class="cyber-input" placeholder="vuoto = me, oppure team@azienda.it">
+            </div>
+            <div class="form-group grow">
+                <label for="folders">FOLDERS (comma separated — vuoto = tutte):</label>
+                <input type="text" id="folders" name="folders" class="cyber-input" placeholder="Inbox,Sent Items,Projects/Client">
+            </div>
+            <div class="form-group narrow">
+                <label for="top">TOP:</label>
+                <input type="number" id="top" name="top" class="cyber-input" value="25" min="1" max="1000">
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group grow">
+                <label for="from">FROM (address):</label>
+                <input type="text" id="from" name="from" class="cyber-input" placeholder="mario@example.com">
+            </div>
+            <div class="form-group grow">
+                <label for="subject">SUBJECT CONTAINS:</label>
+                <input type="text" id="subject" name="subject" class="cyber-input" placeholder="fattura">
+            </div>
+            <div class="form-group grow">
+                <label for="search">KQL SEARCH (alternativo ai filtri OData):</label>
+                <input type="text" id="search" name="search" class="cyber-input" placeholder='from:"mario@example.com" subject:"fattura"'>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group grow">
+                <label for="since">SINCE (ISO 8601):</label>
+                <input type="text" id="since" name="since" class="cyber-input" placeholder="2026-01-01T00:00:00Z">
+            </div>
+            <div class="form-group grow">
+                <label for="until">UNTIL (ISO 8601):</label>
+                <input type="text" id="until" name="until" class="cyber-input" placeholder="2026-12-31T23:59:59Z">
+            </div>
+            <div class="form-group grow">
+                <label for="orderby">ORDERBY (default receivedDateTime desc):</label>
+                <input type="text" id="orderby" name="orderby" class="cyber-input" placeholder="receivedDateTime desc">
+            </div>
+            <div class="form-group narrow">
+                <label for="body_type">BODY:</label>
+                <select id="body_type" name="body_type" class="cyber-input">
+                    <option value="text" selected>TEXT</option>
+                    <option value="html">HTML</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group checkbox-group">
+                <input type="checkbox" id="unread" name="unread" class="cyber-checkbox">
+                <label for="unread">ONLY_UNREAD</label>
+            </div>
+            <div class="form-group checkbox-group">
+                <input type="checkbox" id="has_attachments" name="has_attachments" class="cyber-checkbox">
+                <label for="has_attachments">WITH_ATTACHMENTS</label>
+            </div>
+            <div class="form-group grow">
+                <label for="raw_filter">RAW $filter (OData, opzionale):</label>
+                <input type="text" id="raw_filter" name="filter" class="cyber-input" placeholder="importance eq 'high'">
+            </div>
+            <button type="submit" class="cyber-btn-primary">FETCH_MESSAGES</button>
+        </div>
+    </form>
+
+    <div id="fetch-error" class="error-box" hidden></div>
+    <div id="loading" class="hint" hidden>[+] Querying Microsoft Graph...</div>
+
+    <div id="messages-output" class="messages-output"></div>
+</div>
+
+<div class="cyber-panel">
+    <h2 class="panel-heading">4. AGENT_REST_CONTRACT</h2>
+    <p class="hint">Endpoint equivalenti per l'agente. Aggiungi <code>X-API-Token</code> se configurato.</p>
+    <pre id="curl-snippet" class="code-block"></pre>
+    <button type="button" id="btn-curl" class="cyber-btn-secondary">REFRESH_EXAMPLES</button>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='outlook_reader.js', v='12') }}"></script>
+{% endblock %}

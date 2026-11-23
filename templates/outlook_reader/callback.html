@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PTLifeEasy - OAuth Complete</title>
+    <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=VT323&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        body {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+        }
+        .callback-box {
+            border: 1px solid #333;
+            border-left: 3px solid {{ '#00ff41' if success else '#ff003c' }};
+            background: rgba(21, 24, 40, 0.9);
+            padding: 30px 35px;
+            max-width: 560px;
+            font-family: var(--font-mono);
+        }
+        .callback-title {
+            color: {{ '#00ff41' if success else '#ff003c' }};
+            font-size: 1.8rem;
+            margin-bottom: 15px;
+            letter-spacing: 1px;
+        }
+        .callback-message {
+            color: var(--text-main);
+            font-size: 1.2rem;
+            line-height: 1.5;
+            word-break: break-word;
+        }
+        .callback-hint {
+            margin-top: 20px;
+            color: #777;
+            font-size: 1.05rem;
+        }
+        .callback-box a {
+            color: var(--neon-cyan);
+        }
+    </style>
+</head>
+<body>
+    <div class="scanlines"></div>
+    <div class="callback-box">
+        <div class="callback-title">
+            {% if success %}[+] AUTHENTICATION_COMPLETE{% else %}[!] AUTHENTICATION_FAILED{% endif %}
+        </div>
+        <div class="callback-message">{{ message }}</div>
+        <div class="callback-hint" id="close-hint">
+            <span id="hint-popup" hidden>Puoi chiudere questa finestra: il modulo ha già rilevato l'esito.</span>
+            <span id="hint-same-tab" hidden><a href="{{ module_url }}">Torna al modulo</a> tra un istante...</span>
+        </div>
+    </div>
+
+    <script>
+        (function () {
+            // The popup is opened with a unique window.name, which survives the
+            // redirect back from Microsoft and therefore identifies the popup
+            // without altering the registered redirect_uri.
+            var isPopup = /^outlook-oauth-/.test(window.name || '');
+            var hintPopup = document.getElementById('hint-popup');
+            var hintSameTab = document.getElementById('hint-same-tab');
+
+            if (isPopup) {
+                hintPopup.hidden = false;
+                setTimeout(function () { window.close(); }, {{ 1200 if success else 5000 }});
+            } else {
+                hintSameTab.hidden = false;
+                var target = {{ module_url | tojson }};
+                var params = new URLSearchParams({
+                    status: {{ ('success' if success else 'error') | tojson }},
+                    message: {{ message | tojson }}
+                });
+                setTimeout(function () {
+                    window.location.replace(target + '?' + params.toString());
+                }, {{ 900 if success else 4000 }});
+            }
+        })();
+    </script>
+</body>
+</html>

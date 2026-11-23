@@ -3,3 +3,7 @@ Werkzeug>=3.0.0
 zeep>=4.2.1
 requests>=2.31.0
 PyYAML>=6.0.1
+msal>=1.28.0
+# Optional: only for the unsupported OWA fallback backend (backend=owa)
+# After install run: python -m playwright install chromium
+playwright>=1.40.0

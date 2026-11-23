@@ -1,0 +1,353 @@
+/* Outlook Mail Reader specific styles */
+.flex-between {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    gap: 20px;
+}
+
+.cyber-panel {
+    background: rgba(21, 24, 40, 0.8);
+    border: 1px solid #333;
+    padding: 20px;
+    margin-bottom: 30px;
+    position: relative;
+    box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.5);
+}
+
+.cyber-panel::before {
+    content: '';
+    position: absolute;
+    top: -2px;
+    left: -2px;
+    width: 20px;
+    height: 20px;
+    border-top: 2px solid var(--neon-cyan);
+    border-left: 2px solid var(--neon-cyan);
+}
+
+.panel-heading {
+    color: var(--neon-cyan);
+    font-family: var(--font-mono);
+    font-size: 1.5rem;
+    margin-bottom: 20px;
+    border-bottom: 1px dashed #444;
+    padding-bottom: 5px;
+}
+
+.hint {
+    color: #888;
+    font-family: var(--font-mono);
+    font-size: 1.1rem;
+    margin-bottom: 15px;
+}
+
+.hint code {
+    color: var(--neon-yellow);
+    background: rgba(252, 238, 10, 0.08);
+    padding: 1px 5px;
+}
+
+.status-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    margin-bottom: 20px;
+    font-family: var(--font-mono);
+}
+
+.status-label {
+    display: block;
+    color: var(--neon-yellow);
+    font-size: 1rem;
+    letter-spacing: 1px;
+}
+
+.status-value {
+    display: block;
+    color: var(--text-main);
+    font-size: 1.3rem;
+    word-break: break-all;
+}
+
+.status-value.ok {
+    color: #0f0;
+}
+
+.status-value.ko {
+    color: var(--neon-pink);
+}
+
+.button-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+}
+
+.settings-details {
+    margin-top: 20px;
+    border-top: 1px dashed #444;
+    padding-top: 15px;
+}
+
+.settings-details summary {
+    cursor: pointer;
+    color: var(--neon-cyan);
+    font-family: var(--font-mono);
+    font-size: 1.3rem;
+    margin-bottom: 15px;
+}
+
+.settings-details[open] summary {
+    color: var(--neon-yellow);
+}
+
+.form-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+    align-items: flex-end;
+    margin-bottom: 10px;
+}
+
+.form-row .form-group {
+    margin-bottom: 0;
+}
+
+.form-group.grow {
+    flex: 1 1 220px;
+}
+
+.form-group.narrow {
+    flex: 0 0 110px;
+}
+
+.form-group.align-end {
+    padding-bottom: 8px;
+}
+
+.folders-output {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 15px;
+    font-family: var(--font-mono);
+}
+
+.folder-chip {
+    border: 1px solid #444;
+    padding: 4px 10px;
+    font-size: 1.05rem;
+    color: var(--text-main);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.folder-chip:hover {
+    border-color: var(--neon-cyan);
+    color: var(--neon-cyan);
+}
+
+.folder-chip .count {
+    color: #666;
+    margin-left: 6px;
+}
+
+.messages-output {
+    margin-top: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.message-card {
+    border: 1px solid #333;
+    border-left: 3px solid var(--neon-cyan);
+    padding: 12px 15px;
+    background: rgba(0, 0, 0, 0.35);
+    font-family: var(--font-mono);
+}
+
+.message-card.unread {
+    border-left-color: var(--neon-pink);
+}
+
+.message-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 15px;
+    flex-wrap: wrap;
+    margin-bottom: 6px;
+}
+
+.message-subject {
+    color: var(--neon-cyan);
+    font-size: 1.3rem;
+    word-break: break-word;
+}
+
+.message-date {
+    color: #777;
+    font-size: 1rem;
+    white-space: nowrap;
+}
+
+.message-meta {
+    color: var(--text-main);
+    font-size: 1.05rem;
+    word-break: break-word;
+}
+
+.message-preview {
+    color: #999;
+    font-size: 1rem;
+    margin-top: 6px;
+    white-space: pre-wrap;
+}
+
+.message-actions {
+    margin-top: 8px;
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.message-actions a,
+.message-actions button {
+    font-family: var(--font-mono);
+    font-size: 0.95rem;
+    color: var(--neon-yellow);
+    background: transparent;
+    border: 1px dashed #555;
+    padding: 3px 9px;
+    cursor: pointer;
+    text-decoration: none;
+}
+
+.message-actions a:hover,
+.message-actions button:hover {
+    border-color: var(--neon-yellow);
+    color: #fff;
+}
+
+.message-body {
+    margin-top: 10px;
+    border-top: 1px dashed #333;
+    padding-top: 10px;
+    white-space: pre-wrap;
+    color: var(--text-main);
+    font-size: 1rem;
+    max-height: 400px;
+    overflow: auto;
+}
+
+.error-box {
+    border: 1px solid var(--neon-pink);
+    background: rgba(255, 0, 60, 0.08);
+    color: var(--neon-pink);
+    font-family: var(--font-mono);
+    padding: 12px;
+    margin-top: 15px;
+    white-space: pre-wrap;
+}
+
+.code-block {
+    background: rgba(0, 0, 0, 0.55);
+    border: 1px dashed #444;
+    padding: 15px;
+    color: #0f0;
+    font-family: var(--font-mono);
+    font-size: 1rem;
+    overflow-x: auto;
+    white-space: pre;
+}
+
+.credential-help {
+    margin-top: 20px;
+    border-top: 1px dashed #444;
+    padding-top: 15px;
+    font-family: var(--font-mono);
+}
+
+.credential-help summary {
+    cursor: pointer;
+    color: var(--neon-yellow);
+    font-size: 1.2rem;
+}
+
+.credential-help ol {
+    margin: 15px 0 0 20px;
+    color: var(--text-main);
+    font-size: 1.05rem;
+    line-height: 1.7;
+}
+
+.credential-help ol li {
+    margin-bottom: 8px;
+}
+
+.credential-help a {
+    color: var(--neon-cyan);
+}
+
+.credential-help code {
+    color: var(--neon-yellow);
+    background: rgba(252, 238, 10, 0.08);
+    padding: 1px 5px;
+    word-break: break-all;
+}
+
+/* Auth backend tabs inside section 1 */
+.auth-tabs {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 20px;
+    border-bottom: 1px solid #333;
+    flex-wrap: wrap;
+}
+
+.auth-tab {
+    background: transparent;
+    border: 1px solid #333;
+    border-bottom: none;
+    color: #777;
+    font-family: var(--font-mono);
+    font-size: 1.2rem;
+    padding: 8px 18px;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+    top: 1px;
+}
+
+.auth-tab:hover {
+    color: var(--neon-cyan);
+    border-color: #444;
+}
+
+.auth-tab.is-active {
+    color: var(--neon-cyan);
+    border-color: var(--neon-cyan);
+    background: rgba(0, 240, 255, 0.06);
+}
+
+.auth-tab[data-backend="owa"].is-active {
+    color: var(--neon-pink);
+    border-color: var(--neon-pink);
+    background: rgba(255, 0, 60, 0.06);
+}
+
+.tab-warn {
+    font-size: 0.75rem;
+    color: var(--neon-pink);
+    border: 1px solid var(--neon-pink);
+    padding: 0 4px;
+    margin-left: 6px;
+    vertical-align: middle;
+}
+
+.tab-pane[hidden] {
+    display: none;
+}
