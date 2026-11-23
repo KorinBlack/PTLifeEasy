@@ -3,7 +3,7 @@
 {% block title %}Outlook Mail Reader{% endblock %}
 
 {% block head %}
-<link rel="stylesheet" href="{{ url_for('static', filename='outlook_reader.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='outlook_reader/outlook_reader.css') }}">
 {% endblock %}
 
 {% block content %}
@@ -264,5 +264,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', filename='outlook_reader.js', v='12') }}"></script>
+<script src="{{ url_for('static', filename='outlook_reader/outlook_reader.js', v='12') }}"></script>
 {% endblock %}

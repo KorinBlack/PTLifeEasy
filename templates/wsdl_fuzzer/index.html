@@ -3,7 +3,7 @@
 {% block title %}WSDL Parser & Fuzzer{% endblock %}
 
 {% block head %}
-<link rel="stylesheet" href="{{ url_for('static', filename='wsdl_fuzzer.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='wsdl_fuzzer/wsdl_fuzzer.css') }}">
 <script src="https://cdn.jsdelivr.net/npm/vue@2.7.14/dist/vue.js"></script>
 {% endblock %}
 
@@ -244,5 +244,5 @@
 
 {% block scripts %}
 <!-- Vue Custom Delimiters to not conflict with Jinja -->
-<script src="{{ url_for('static', filename='wsdl_fuzzer.js') }}"></script>
+<script src="{{ url_for('static', filename='wsdl_fuzzer/wsdl_fuzzer.js') }}"></script>
 {% endblock %}

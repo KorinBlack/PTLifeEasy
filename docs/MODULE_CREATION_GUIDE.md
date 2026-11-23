@@ -75,6 +75,9 @@ def status():
 ## Best Practices
 
 - **Templates**: If your module needs its own HTML pages, create them in the main `templates/` directory (e.g., `templates/nmap_index.html`) and use `{% extends 'base.html' %}` to inherit the Cyberpunk aesthetic and navigation bar.
-- **Static Files**: Any specific JS/CSS for your module should ideally be placed in the main `static/` directory, or you can configure your Blueprint to serve its own static folder.
+- **Static Files**: Put module-specific JS/CSS in a folder named after the module, e.g.
+  `static/my_tool/my_tool.css` and `static/my_tool/my_tool.js`, and reference them as
+  `url_for('static', filename='my_tool/my_tool.css')`. Core assets shared by every page
+  (`style.css`, `script.js`) stay in the root of `static/`.
 - **Dependencies**: If your module introduces new pip requirements (like `nmap`, `requests`, `bs4`), make sure to add them to `requirements.txt`.
 - **Class-Based Architecture (For Large Modules)**: For complex modules with heavy business logic, avoid putting all your code directly inside the Flask routes. Instead, encapsulate your core operations within dedicated Python classes (placed in the `classes/` directory). Your module file (`modules/my_tool.py`) should primarily handle request routing and response formatting, delegating the actual processing to your core classes. This decouples your logic from the web framework, significantly improving maintainability, testability, and potential CLI reuse.

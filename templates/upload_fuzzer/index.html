@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% block title %}Upload Fuzzer{% endblock %}
 {% block head %}
-<link rel="stylesheet" href="{{ url_for('static', filename='upload_fuzzer.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='upload_fuzzer/upload_fuzzer.css') }}">
 {% endblock %}
 
 {% block content %}
@@ -184,5 +184,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', filename='upload_fuzzer.js') }}"></script>
+<script src="{{ url_for('static', filename='upload_fuzzer/upload_fuzzer.js') }}"></script>
 {% endblock %}
