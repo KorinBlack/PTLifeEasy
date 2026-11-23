@@ -48,7 +48,7 @@
 
 The true power of PTLifeEasy lies in its extensibility. You can create standalone security tools (like a WSDL Fuzzer, Nmap parser, Directory Brute-forcer, etc.) and integrate them seamlessly.
 
-For a comprehensive guide on creating modules, including the recommended **Class-Based Architecture** for larger projects, please refer to the [Module Creation Guide](MODULE_CREATION_GUIDE.md).
+For a comprehensive guide on creating modules, including the recommended **Class-Based Architecture** for larger projects, please refer to the [Module Creation Guide](docs/MODULE_CREATION_GUIDE.md).
 
 ### Quick Module Overview
 1. Create `modules/my_tool.py`.
