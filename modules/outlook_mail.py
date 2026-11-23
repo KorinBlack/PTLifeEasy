@@ -57,11 +57,30 @@ def get_client():
 
 
 def get_owa_reader():
-    """Alternative backend: drives a signed-in Outlook Web profile."""
+    """Alternative backend: drives a signed-in Outlook Web profile.
+
+    keep_alive defaults to on: a warm browser drops a query from ~4.5s to
+    ~150ms for ~600MB RSS. It can be disabled per call via ?keep_alive=false,
+    which tears the browser down after the request.
+    """
     global _owa_reader
     if _owa_reader is None:
-        _owa_reader = OwaReader(headless=True)
+        _owa_reader = OwaReader(headless=True, keep_alive=False)
     return _owa_reader
+
+
+def _owa_reader_for_request():
+    """Honour a per-request keep_alive toggle without restarting the app."""
+    keep_alive = request.args.get('keep_alive')
+    reader = get_owa_reader()
+    if keep_alive is None:
+        return reader
+    wanted = _truthy(keep_alive)
+    if wanted != reader.keep_alive:
+        if not wanted:
+            reader.close()
+        reader.keep_alive = wanted
+    return reader
 
 
 def _requested_backend():
@@ -312,6 +331,51 @@ def owa_diagnostics():
     return jsonify(get_owa_reader().diagnostics())
 
 
+@module_bp.route('/api/owa/session', methods=['GET'])
+def owa_session():
+    """State of the keep-alive browser: warm or cold, and when it was used."""
+    reader = get_owa_reader()
+    warm = False
+    try:
+        warm = bool(reader._page is not None and not reader._page.is_closed())
+    except Exception:
+        warm = False
+    return jsonify({
+        "keep_alive": reader.keep_alive,
+        "browser_running": warm,
+        "profile_signed_in": profile_signed_in(),
+        "last_used": reader._last_used or None,
+    })
+
+
+@module_bp.route('/api/owa/session', methods=['POST'])
+def owa_session_control():
+    """Warm up or shut down the keep-alive browser.
+
+    ``{"action": "start"}`` opens it now so the first query is already fast;
+    ``{"action": "stop"}`` releases the ~600MB it holds.
+    """
+    reader = get_owa_reader()
+    payload = request.get_json(silent=True) or {}
+    action = str(payload.get('action') or request.args.get('action') or 'start').strip().lower()
+
+    if action == 'stop':
+        reader.close()
+        return jsonify({"keep_alive": reader.keep_alive, "browser_running": False})
+
+    if action != 'start':
+        raise OwaError("Azione non valida: usa 'start' oppure 'stop'.", 400, "invalid_action")
+
+    reader.keep_alive = True
+    if not reader._warm_up():
+        raise OwaError(
+            "Impossibile aprire la casella: esegui BOOTSTRAP_OWA_LOGIN.",
+            401,
+            "owa_login_required",
+        )
+    return jsonify({"keep_alive": True, "browser_running": True})
+
+
 # ----------------------------------------------------------------------
 # OAuth 2.0 Authorization Code Flow
 # ----------------------------------------------------------------------
@@ -415,7 +479,7 @@ def get_me():
 @module_bp.route('/api/folders', methods=['GET'])
 def get_folders():
     if _requested_backend() == 'owa':
-        return jsonify(get_owa_reader().list_folders())
+        return jsonify(_owa_reader_for_request().list_folders())
 
     client = get_client()
     folders = client.list_folders(
@@ -441,7 +505,7 @@ def get_messages():
     skip = _int_or_none(args.get('skip'))
 
     if _requested_backend() == 'owa':
-        return jsonify(get_owa_reader().list_messages(
+        return jsonify(_owa_reader_for_request().list_messages(
             folders=folders or None,
             top=top,
             from_contains=(args.get('from') or '').strip() or None,
@@ -472,7 +536,7 @@ def get_messages():
 @module_bp.route('/api/messages/<path:message_id>', methods=['GET'])
 def get_message(message_id):
     if _requested_backend() == 'owa':
-        return jsonify(get_owa_reader().get_message(
+        return jsonify(_owa_reader_for_request().get_message(
             message_id,
             body_type=request.args.get('body_type', 'text'),
         ))

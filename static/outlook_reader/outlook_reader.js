@@ -350,7 +350,37 @@ async function loadOwaStatus() {
     } catch (err) {
         setStatusValue('owa-playwright', 'ERROR', false);
     }
+    try {
+        const session = await jsonFetch(`${API}/owa/session`);
+        setStatusValue('owa-browser',
+            session.browser_running ? 'WARM' : 'COLD',
+            session.browser_running);
+    } catch (err) {
+        setStatusValue('owa-browser', 'UNKNOWN', false);
+    }
 }
+
+async function owaSession(action) {
+    clearError();
+    const buttons = ['btn-owa-warm', 'btn-owa-cold'].map(el);
+    buttons.forEach((b) => { if (b) b.disabled = true; });
+    try {
+        const data = await jsonFetch(`${API}/owa/session`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action }),
+        });
+        setStatusValue('owa-browser', data.browser_running ? 'WARM' : 'COLD', data.browser_running);
+    } catch (err) {
+        showError(err.message, err.payload && err.payload.details);
+    } finally {
+        buttons.forEach((b) => { if (b) b.disabled = false; });
+        loadOwaStatus();
+    }
+}
+
+function warmOwa() { return owaSession('start'); }
+function coldOwa() { return owaSession('stop'); }
 
 // ---------------------------------------------------------------------
 // Auth tabs: the active tab also selects the backend for sections 2 and 3.
@@ -688,6 +718,8 @@ document.addEventListener('DOMContentLoaded', () => {
     el('btn-curl').addEventListener('click', renderCurl);
     el('btn-owa-bootstrap').addEventListener('click', bootstrapOwa);
     el('btn-owa-diag').addEventListener('click', owaDiagnostics);
+    el('btn-owa-warm').addEventListener('click', warmOwa);
+    el('btn-owa-cold').addEventListener('click', coldOwa);
 
     document.querySelectorAll('.auth-tab').forEach((tab) => {
         tab.addEventListener('click', () => selectAuthTab(tab.dataset.backend));

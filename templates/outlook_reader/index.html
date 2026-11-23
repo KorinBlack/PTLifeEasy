@@ -146,12 +146,20 @@
             <div><span class="status-label">PLAYWRIGHT</span><span id="owa-playwright" class="status-value">...</span></div>
             <div><span class="status-label">PROFILE</span><span id="owa-profile" class="status-value">...</span></div>
             <div><span class="status-label">ACTIVE_BACKEND</span><span id="owa-active" class="status-value">...</span></div>
+            <div><span class="status-label">BROWSER</span><span id="owa-browser" class="status-value">...</span></div>
         </div>
 
         <div class="button-row">
             <button type="button" id="btn-owa-bootstrap" class="cyber-btn-secondary">BOOTSTRAP_OWA_LOGIN</button>
+            <button type="button" id="btn-owa-warm" class="cyber-btn-secondary">START_KEEP_ALIVE</button>
+            <button type="button" id="btn-owa-cold" class="cyber-btn-secondary">STOP_KEEP_ALIVE</button>
             <button type="button" id="btn-owa-diag" class="cyber-btn-secondary">DIAGNOSTICS</button>
         </div>
+        <p class="hint" style="margin-top:12px;">
+            Il browser resta aperto (~600 MB) e le query scendono da ~4,5 s a ~0,3 s.
+            Il token Outlook dura ~24 h e viene rinnovato da solo: se manca o sta per
+            scadere, la pagina lo riacquisisce dal refresh token prima di interrogare.
+        </p>
         <p class="hint" style="margin-top:12px;">
             BOOTSTRAP apre una finestra: fai il login Microsoft una volta, poi chiudi. Il profilo
             conserva la sessione e il backend OWA la riusa. Mentre questo tab e' attivo le richieste
@@ -264,5 +272,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', filename='outlook_reader/outlook_reader.js', v='12') }}"></script>
+<script src="{{ url_for('static', filename='outlook_reader/outlook_reader.js', v='13') }}"></script>
 {% endblock %}

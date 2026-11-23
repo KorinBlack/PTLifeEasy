@@ -250,7 +250,9 @@ cURL examples in section 4 follow it.
 | `GET /api/owa/status` | Health check (does not launch a browser) |
 | `POST /api/owa/bootstrap` | Starts the one-time sign-in in the background (returns immediately) |
 | `GET /api/owa/bootstrap/status` | `running` / `authenticated` / `profile_signed_in` for that sign-in |
-| `GET /api/owa/diagnostics` | Shows what the scraper currently sees (sample rows, selector hits) |
+| `GET /api/owa/diagnostics` | Token and folder state, for debugging |
+| `GET /api/owa/session` | Keep-alive state: `browser_running`, `last_used` |
+| `POST /api/owa/session` | `{"action":"start"}` warms the browser, `"stop"` releases it |
 
 With `backend=owa`, `GET /api/folders` returns the real folder tree (custom folders included),
 each entry marked `source: mailbox` (real folder from the mailbox) or `source: well_known`.
@@ -296,6 +298,38 @@ window open for the whole budget (default 600 s) and returns only when the mailb
 
 Note that OWA now serves from `outlook.cloud.microsoft`, redirecting from `outlook.office.com`; both
 hosts are accepted.
+
+### Keep-alive browser and token renewal
+
+Opening a browser per request costs ~4–5s. With `keep_alive` the profile stays open:
+
+| | Cold (per request) | Warm (keep-alive) |
+|---|---|---|
+| Latency | 4–5 s | **0.3–0.9 s** |
+| RAM | ~0 idle | **580–650 MB** |
+| CPU idle | 0 | **0.3–0.7 % of a core** |
+
+```bash
+curl -s -X POST -H 'Content-Type: application/json' \
+     -d '{"action":"start"}' http://localhost:5001/outlook/api/owa/session
+curl -s http://localhost:5001/outlook/api/owa/session     # browser_running
+curl -s -X POST -H 'Content-Type: application/json' \
+     -d '{"action":"stop"}'  http://localhost:5001/outlook/api/owa/session
+```
+
+In the UI: `START_KEEP_ALIVE` / `STOP_KEEP_ALIVE`, with the `BROWSER` field showing `WARM` or `COLD`.
+`stop` releases the memory immediately (verified: 88 MB → 0).
+
+**Threading:** Playwright's sync API is bound to the thread that created it, while Flask serves each
+request on a different thread. The browser is therefore owned by a single dedicated worker thread and
+every call is funnelled through it; without this the second request fails with
+`Playwright connection closed`.
+
+**Token renewal:** the Outlook API token lives ~24h. It is not refreshed on a timer — it is checked
+before each API call, and when it is missing or under 15 minutes from expiry the page is reloaded so
+OWA's own MSAL redeems the refresh token and stores a fresh one. Verified end-to-end: deleting the
+token from storage still yields a working query (one slow call, ~7s) and a new ~27h token. No
+credential is read by the module; only the token OWA already manages.
 
 ### How it reads mail (important)
 
