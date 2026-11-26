@@ -192,6 +192,9 @@ class OwaReader:
     with :meth:`close`.
     """
 
+    # Renew the Outlook token when this many seconds remain before expiry.
+    TOKEN_REFRESH_MARGIN = 900
+
     def __init__(self, profile_dir=None, headless=True, timeout=OPERATION_TIMEOUT,
                  keep_alive=False):
         self.profile_dir = profile_dir or default_profile_dir()
@@ -335,15 +338,15 @@ class OwaReader:
         """Shut the keep-alive browser down and release the profile."""
         with self._lock:
             if self._queue is not None and self._worker is not None and self._worker.is_alive():
-                self._close_box = {}
-
-                def job():
-                    self._teardown()
-                    self._close_box["ok"] = True
-
+                # Teardown must happen on the thread that owns Playwright.
                 done = threading.Event()
+
                 def wrapped():
-                    job(); done.set()
+                    try:
+                        self._teardown()
+                    finally:
+                        done.set()
+
                 self._queue.put(wrapped)
                 done.wait(timeout=30)
                 self._queue.put(None)
@@ -538,6 +541,144 @@ class OwaReader:
             return result
         finally:
             self._bootstrap_lock.release()
+
+    def _token_info(self, page):
+        """Return lifetime details of the best mail-read token, or None."""
+        script = r"""
+        () => {
+            const entries = [];
+            for (const k of Object.keys(localStorage)) {
+                let e;
+                try { e = JSON.parse(localStorage.getItem(k)); } catch (err) { continue; }
+                if (!e || e.credentialType !== 'AccessToken' || !e.secret) continue;
+                const target = e.target || '';
+                if (!/outlook\.office\.com/i.test(target)) continue;
+                if (!/mail\.read/i.test(target)) continue;
+                entries.push({
+                    token: e.secret,
+                    expiresOn: Number(e.expiresOn || 0),
+                    target: target,
+                });
+            }
+            if (!entries.length) return null;
+            // Same scope string can appear in several entries; keep the freshest.
+            entries.sort((a, b) => b.expiresOn - a.expiresOn);
+            const best = entries[0];
+            return {
+                token: best.token,
+                expiresOn: best.expiresOn,
+                remaining: Math.round(best.expiresOn - Date.now() / 1000),
+            };
+        }
+        """
+        try:
+            return page.evaluate(script)
+        except Exception:
+            return None
+
+    def _force_renewal(self, page):
+        """Make OWA's own MSAL re-acquire the token from its refresh token.
+
+        A reload is exactly what a user's browser would do: MSAL sees the access
+        token missing/stale and silently redeems the refresh token. Verified to
+        return a fresh ~26h token. No credential is read from the page.
+        """
+        try:
+            page.reload(wait_until="domcontentloaded")
+            page.wait_for_timeout(6000)
+        except Exception:
+            pass
+
+    def _outlook_token(self, page, force=False):
+        """Return a usable Outlook API token, renewing it when needed.
+
+        The token has a ~24h lifetime and OWA renews it silently while the page
+        is alive; the module only has to notice it is missing or close to
+        expiry and let the page refresh itself.
+        """
+        info = None if force else self._token_info(page)
+
+        if info is None or info.get("remaining", 0) < self.TOKEN_REFRESH_MARGIN:
+            self._force_renewal(page)
+            info = self._token_info(page)
+
+        if not info or not info.get("token"):
+            raise OwaError(
+                "Nessun token API Outlook trovato nella sessione di Outlook Web. "
+                "Esegui di nuovo il bootstrap (BOOTSTRAP_OWA_LOGIN) e verifica di "
+                "essere arrivato alla casella.",
+                401,
+                "owa_token_missing",
+            )
+        return info["token"]
+
+    def _api_get(self, page, token, path, params=None):
+        """GET on Outlook REST v2.0 from inside the OWA page.
+
+        Running the fetch in the page keeps cookies, CORS and any conditional
+        access context identical to OWA's own requests.
+        """
+        script = """
+        async ({token, path, params}) => {
+            const query = new URLSearchParams(params || {});
+            const url = 'https://outlook.office.com/api/v2.0' + path
+                + (query.toString() ? '?' + query.toString() : '');
+            const response = await fetch(url, {
+                headers: { Authorization: 'Bearer ' + token, Accept: 'application/json' },
+                credentials: 'omit',
+            });
+            const text = await response.text();
+            return { status: response.status, body: text.slice(0, 900000) };
+        }
+        """
+        try:
+            raw = page.evaluate(script, {"token": token, "path": path, "params": params or {}})
+        except Exception as exc:
+            raise OwaError(f"Chiamata Outlook API fallita: {exc}", 502, "owa_api_failed") from exc
+
+        if not raw:
+            raise OwaError("Nessuna risposta dall'API Outlook.", 502, "owa_api_failed")
+        if raw.get("status") == 401:
+            raise OwaError(
+                "Token API Outlook scaduto o rifiutato. Esegui di nuovo il bootstrap.",
+                401,
+                "owa_token_expired",
+            )
+        if raw.get("status") != 200:
+            detail = (raw.get("body") or "")[:300]
+            raise OwaError(
+                f"L'API Outlook ha risposto HTTP {raw.get('status')}: {detail}",
+                502,
+                "owa_api_error",
+            )
+        try:
+            return json.loads(raw.get("body") or "{}")
+        except ValueError as exc:
+            raise OwaError("Risposta API Outlook non valida.", 502, "owa_api_bad_json") from exc
+
+    def _api_folders(self, page, token):
+        """Recursive folder tree as path -> {id, name, path}."""
+        folders = {}
+        queue = [("", "/me/MailFolders", {"$top": "100"})]
+
+        while queue:
+            prefix, path, params = queue.pop(0)
+            data = self._api_get(page, token, path, params)
+            for item in data.get("value") or []:
+                name = item.get("DisplayName")
+                folder_id = item.get("Id")
+                if not name or not folder_id:
+                    continue
+                full = f"{prefix}{name}"
+                folders[full.lower()] = {"id": folder_id, "name": name, "path": full}
+                if item.get("ChildFolderCount"):
+                    queue.append((f"{full}/", f"/me/MailFolders/{folder_id}/childfolders", {"$top": "100"}))
+            next_link = data.get("@odata.nextLink") or data.get("odata.nextLink")
+            if next_link and "skiptoken" in next_link.lower():
+                token_param = next_link.split("$skiptoken=")[-1].split("&")[0]
+                queue.append((prefix, path, {"$skiptoken": token_param}))
+
+        return folders
 
     def list_folders(self, mailbox=None, include_hidden=False):
         """Folder list from the mailbox itself, custom folders included."""
