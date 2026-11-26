@@ -427,7 +427,7 @@ function stopBootstrapPolling() {
     }
 }
 
-async function bootstrapOwa() {
+async function bootstrapOwa(force) {
     clearError();
     const button = el('btn-owa-bootstrap');
     button.disabled = true;
@@ -436,7 +436,8 @@ async function bootstrapOwa() {
         + 'La finestra resta aperta finche\' la casella non e\' raggiungibile.');
 
     try {
-        showOwaOutput(await jsonFetch(`${API}/owa/bootstrap`, { method: 'POST' }));
+        const suffix = force ? '?force=true' : '';
+        showOwaOutput(await jsonFetch(`${API}/owa/bootstrap${suffix}`, { method: 'POST' }));
     } catch (err) {
         showOwaOutput(err.payload || { error: err.message });
         button.disabled = false;
@@ -480,6 +481,17 @@ async function bootstrapOwa() {
             button.textContent = 'BOOTSTRAP_OWA_LOGIN';
         }
     }, 2000);
+}
+
+async function resetOwaBrowser() {
+    clearError();
+    try {
+        showOwaOutput(await jsonFetch(`${API}/owa/reset`, { method: 'POST' }));
+    } catch (err) {
+        showOwaOutput(err.payload || { error: err.message });
+    }
+    stopBootstrapPolling();
+    await loadOwaStatus();
 }
 
 async function owaDiagnostics() {
@@ -716,10 +728,11 @@ document.addEventListener('DOMContentLoaded', () => {
     el('btn-logout').addEventListener('click', logout);
     el('btn-me').addEventListener('click', verifyIdentity);
     el('btn-curl').addEventListener('click', renderCurl);
-    el('btn-owa-bootstrap').addEventListener('click', bootstrapOwa);
+    el('btn-owa-bootstrap').addEventListener('click', () => bootstrapOwa(false));
     el('btn-owa-diag').addEventListener('click', owaDiagnostics);
     el('btn-owa-warm').addEventListener('click', warmOwa);
     el('btn-owa-cold').addEventListener('click', coldOwa);
+    el('btn-owa-reset').addEventListener('click', resetOwaBrowser);
 
     document.querySelectorAll('.auth-tab').forEach((tab) => {
         tab.addEventListener('click', () => selectAuthTab(tab.dataset.backend));

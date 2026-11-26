@@ -283,7 +283,18 @@ def owa_bootstrap():
     timeout = _int_or_none(request.args.get('timeout')) or 600
     with _bootstrap_lock:
         if _bootstrap_state["running"]:
-            return jsonify({"running": True, "message": "Bootstrap gia' in corso."})
+            # A previous attempt may be stuck (e.g. left over from a crash or a
+            # browser that never appeared). Let the caller force a clean retry.
+            started = _bootstrap_state.get("started_at") or 0
+            age = time.time() - started
+            # Do not trust "running" forever: a dead worker thread must not lock
+            # out new attempts. The bootstrap itself has a 600s default budget.
+            if age < (timeout + 120) and not _truthy(request.args.get('force')):
+                return jsonify({
+                    "running": True,
+                    "age_seconds": round(age),
+                    "message": "Bootstrap gia' in corso: usa ?force=true per forzare.",
+                })
         _bootstrap_state.update({
             "running": True,
             "authenticated": None,
@@ -315,6 +326,33 @@ def owa_bootstrap():
 
     threading.Thread(target=worker, name="owa-bootstrap", daemon=True).start()
     return jsonify({"running": True, "message": "Finestra aperta: completa il login Microsoft."})
+
+
+@module_bp.route('/api/owa/reset', methods=['POST'])
+def owa_reset():
+    """Release every browser holding the profile and clear a stuck bootstrap.
+
+    Chromium allows only one browser per profile directory. If a previous run
+    left one behind, the next bootstrap cannot open a window at all.
+    """
+    reader = get_owa_reader()
+    was_running = _bootstrap_state.get("running")
+    try:
+        reader.close()
+    except Exception:
+        pass
+    with _bootstrap_lock:
+        _bootstrap_state.update({
+            "running": False,
+            "authenticated": None,
+            "message": "Stato azzerato manualmente." if was_running else "Nessun bootstrap attivo.",
+            "finished_at": time.time(),
+        })
+    return jsonify({
+        "reset": True,
+        "was_running": bool(was_running),
+        "profile_signed_in": profile_signed_in(default_profile_dir()),
+    })
 
 
 @module_bp.route('/api/owa/bootstrap/status', methods=['GET'])

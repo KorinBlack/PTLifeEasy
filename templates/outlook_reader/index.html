@@ -153,6 +153,7 @@
             <button type="button" id="btn-owa-bootstrap" class="cyber-btn-secondary">BOOTSTRAP_OWA_LOGIN</button>
             <button type="button" id="btn-owa-warm" class="cyber-btn-secondary">START_KEEP_ALIVE</button>
             <button type="button" id="btn-owa-cold" class="cyber-btn-secondary">STOP_KEEP_ALIVE</button>
+            <button type="button" id="btn-owa-reset" class="cyber-btn-secondary">RESET_BROWSER</button>
             <button type="button" id="btn-owa-diag" class="cyber-btn-secondary">DIAGNOSTICS</button>
         </div>
         <p class="hint" style="margin-top:12px;">
@@ -272,5 +273,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', filename='outlook_reader/outlook_reader.js', v='13') }}"></script>
+<script src="{{ url_for('static', filename='outlook_reader/outlook_reader.js', v='14') }}"></script>
 {% endblock %}
